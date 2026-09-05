@@ -1,0 +1,16 @@
+server:
+  port: 8082
+
+spring:
+  profiles:
+    active: dev
+  servlet:
+    multipart:
+      # 单个文件最大大小
+      max-file-size: 10MB
+      # 整个请求最大大小
+      max-request-size: 100MB
+
+mybatis:
+  mapper-locations: classpath:/mapper/**/*.xml
+
