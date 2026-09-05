@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tasklist)",
+      "Bash(wmic process *)",
+      "Bash(docker restart rocketmq-broker *)"
+    ]
+  }
+}
