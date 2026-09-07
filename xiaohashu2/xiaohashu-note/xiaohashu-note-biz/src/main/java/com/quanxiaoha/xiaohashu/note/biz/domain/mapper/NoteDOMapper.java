@@ -70,4 +70,11 @@ public interface NoteDOMapper {
      * 批量查询笔记计数（点赞/收藏/评论数）
      */
     List<com.quanxiaoha.xiaohashu.note.biz.domain.dataobject.NoteCountDO> selectCountByNoteIds(@Param("noteIds") List<Long> noteIds);
+
+
+    /**
+     * 查询个人主页已发布笔记列表
+     */
+    List<NoteDO> selectPublishedNoteListByUserIdAndCursor(@Param("creatorId") Long creatorId,
+                                                          @Param("cursor") Long cursor);
 }
