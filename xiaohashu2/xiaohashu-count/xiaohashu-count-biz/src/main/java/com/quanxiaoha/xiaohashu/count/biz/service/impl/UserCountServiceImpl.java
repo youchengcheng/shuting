@@ -11,18 +11,13 @@ import com.quanxiaoha.xiaohashu.count.dto.FindUserCountsByIdReqDTO;
 import com.quanxiaoha.xiaohashu.count.dto.FindUserCountsByIdRspDTO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.checkerframework.checker.nullness.qual.Nullable;
-import org.checkerframework.checker.units.qual.K;
-import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /*
@@ -38,7 +33,6 @@ public class UserCountServiceImpl implements UserCountService {
     private RedisTemplate<String,Object> redisTemplate;
     @Resource(name = "taskExecutor")
     private ThreadPoolTaskExecutor threadPoolTaskExecutor;
-
 
     /*
     * 查询用户相关计数
@@ -133,6 +127,7 @@ public class UserCountServiceImpl implements UserCountService {
 
         return Response.success(findUserCountsByIdRspDTO);
     }
+
 
     /*
     * 异步同步到 Redis 缓存中, 以便下次查询能够命中缓存

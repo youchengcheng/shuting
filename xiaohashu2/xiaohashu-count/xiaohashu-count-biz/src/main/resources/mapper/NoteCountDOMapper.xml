@@ -112,6 +112,16 @@
     ON DUPLICATE KEY UPDATE comment_total = comment_total + (#{count});
   </insert>
 
+<!-- 根据笔记 ID 批量查询 -->
+  <select id="selectByNoteIds" resultMap="BaseResultMap">
+    select note_id, like_total, collect_total, comment_total
+    from t_note_count
+    where note_id in
+    <foreach collection="noteIds" item="noteId" open="(" separator="," close=")">
+      #{noteId}
+    </foreach>
+  </select>
+
 
 
 </mapper>
