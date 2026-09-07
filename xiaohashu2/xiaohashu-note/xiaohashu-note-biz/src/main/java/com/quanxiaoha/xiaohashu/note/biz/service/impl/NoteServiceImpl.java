@@ -1266,6 +1266,80 @@ public class NoteServiceImpl implements NoteService {
                         .build());
     }
 
+
+    /*
+    * 用户主页 - 查询已发布的笔记列表
+    * */
+    @Override
+    public Response<FindPublishedNoteListRspVO> findPublishedNoteList(FindPublishedNoteListReqVO findPublishedNoteListReqVO) {
+        //目标用户
+        Long userId = findPublishedNoteListReqVO.getUserId();
+        //游标
+        Long cursor = findPublishedNoteListReqVO.getCursor();
+
+        // TODO: 优先查询缓存
+
+        // 缓存无，则查询数据库
+        List<NoteDO> noteDOS = noteDOMapper.selectPublishedNoteListByUserIdAndCursor(userId, cursor);
+
+        // 该用户暂无已发布笔记，直接返回空列表
+        if (CollUtil.isEmpty(noteDOS)) {
+            return Response.success(FindPublishedNoteListRspVO.builder()
+                    .notes(Collections.emptyList())
+                    .build());
+        }
+
+        //反参VO
+        FindPublishedNoteListRspVO findPublishedNoteListRspVO = null;
+        if(Objects.nonNull(noteDOS)) {
+            //DO转VO
+            List<NoteItemRspVO> noteVOS = noteDOS.stream()
+                    .map(noteDO -> {
+                        //获取封面图片
+                        String cover = StringUtils.isNotBlank(noteDO.getImgUris()) ?
+                                StringUtils.split(noteDO.getImgUris(), ",")[0] : null;
+
+                        NoteItemRspVO noteItemRspVO = NoteItemRspVO.builder()
+                                .noteId(noteDO.getId())
+                                .type(noteDO.getType())
+                                .cover(cover)
+                                .videoUri(noteDO.getVideoUri())
+                                .title(noteDO.getTitle())
+                                .creatorId(noteDO.getCreatorId())
+                                .build();
+                        return noteItemRspVO;
+                    }).toList();
+
+            // Feign 调用用户服务，获取用户头像、昵称
+            //因为笔记都是一个人发布的，所有这里任意获取一篇笔记的作者id就行
+            Optional<Long> creatorIdOptional = noteDOS.stream().map(NoteDO::getCreatorId).findAny();
+            FindUserByIdRspDTO findUserByIdRspDTO = userRpcService.findById(creatorIdOptional.get());
+
+            if(Objects.nonNull(findUserByIdRspDTO)){
+                //循环 VO 集合，分别设置头像，昵称
+                noteVOS.forEach(noteItemRspVO -> {
+                    noteItemRspVO.setAvatar(findUserByIdRspDTO.getAvatar());
+                    noteItemRspVO.setNickname(findUserByIdRspDTO.getNickName());
+                });
+            }
+
+            // TODO: Feign 调用计数服务，批量获取笔记点赞数
+
+            //过滤最早发布的笔记id，作为下一页的游标
+            Optional<Long> earlistNoteId = noteDOS.stream().map(NoteDO::getId).min(Long::compareTo);
+
+            findPublishedNoteListRspVO = FindPublishedNoteListRspVO.builder()
+                    .notes(noteVOS)
+                    .nextCursor(earlistNoteId.orElse(null))
+                    .build();
+        }
+
+
+
+
+        return Response.success(findPublishedNoteListRspVO);
+    }
+
     /*
     * 校验当前登录用户是否收藏笔记
     * */
