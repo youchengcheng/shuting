@@ -24,7 +24,6 @@ public class DelayDeleteNoteRedisCacheConsumer implements RocketMQListener<Strin
     @Resource
     private RedisTemplate<String,Object> redisTemplate;
 
-
     @Override
     public void onMessage(String message) {
         Long noteId = Long.valueOf(message);

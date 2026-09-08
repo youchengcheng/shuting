@@ -15,6 +15,11 @@ import lombok.NoArgsConstructor;
 public class NoteItemRspVO {
 
     /**
+     * 当前登录用户是否已点赞
+     */
+    private Boolean isLiked;
+
+    /**
      * 笔记 ID
      */
     private Long noteId;
