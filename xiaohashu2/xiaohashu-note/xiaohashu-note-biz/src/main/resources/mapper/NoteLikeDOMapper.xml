@@ -113,7 +113,7 @@
     order by create_time desc limit #{limit}
   </select>
 
-  <!-- 新增笔记点赞记录，若已存在，则更新笔记点赞记录 -->
+    <!-- 新增笔记点赞记录，若已存在，则更新笔记点赞记录 -->
   <insert id="insertOrUpdate">
     insert into t_note_like (user_id, note_id, create_time, status)
     values (#{userId}, #{noteId}, #{createTime}, #{status})
@@ -135,5 +135,16 @@
     ON DUPLICATE KEY UPDATE
     status = VALUES(status)
   </insert>
+
+<!-- 查询某用户，对于一批量笔记的已点赞记录 -->
+  <select id="selectByUserIdAndNoteIds" resultMap="BaseResultMap" parameterType="map">
+    select note_id, user_id from t_note_like
+    where user_id = #{userId} and status = 1
+    and note_id in
+    <foreach collection="noteIds" item="noteId" open="(" separator="," close=")">
+      #{noteId}
+    </foreach>
+  </select>
+
 
 </mapper>
