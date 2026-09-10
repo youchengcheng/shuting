@@ -69,7 +69,7 @@
             class="ml-1 text-[12px] text-gray-600 transition-all duration-300"
             :class="{'scale-animation': isLiked}"
           >
-            {{ likeCount || 0 }}
+            {{ likeText }}
           </span>
         </button>
       </div>
@@ -78,7 +78,7 @@
 </template>
 
 <script setup>
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, watch } from 'vue'
 import { likeNote, unlikeNote } from '@/api/note'
 import { message } from '@/utils/message'
 import { useUserStore } from '@/stores/user'
@@ -94,9 +94,37 @@ const props = defineProps({
 
 defineEmits(['click'])
 
-// 点赞状态
+// 点赞状态与数量
+// 后端接口返回的 likeTotal 可能是数字（发现页），也可能是 “1.2万” 这类格式化字符串（已发布笔记列表）
 const isLiked = ref(false)
-const likeCount = ref(props.note.likeTotal)
+const likeNum = ref(0)
+
+// 将后端返回的点赞数解析为数值
+const parseLikeTotal = (value) => {
+  if (value === null || value === undefined || value === '') return 0
+  if (typeof value === 'number') return value
+  const text = String(value).trim()
+  const wanMatch = text.match(/^(\d+(?:\.\d+)?)万$/)
+  if (wanMatch) return Math.floor(parseFloat(wanMatch[1]) * 10000)
+  const num = parseInt(text, 10)
+  return Number.isNaN(num) ? 0 : num
+}
+
+// 与后端 NumberUtils.formatNumberString 保持一致：小于 1 万原样展示，大于等于 1 万转为 “x.x万”
+const formatLikeTotal = (num) => {
+  if (num < 10000) return String(num)
+  if (num >= 100000000) return '9999万'
+  return `${Math.floor(num / 1000) / 10}万`
+}
+
+const likeText = computed(() => formatLikeTotal(likeNum.value))
+
+// 笔记数据变化（如重新进入页面、刷新列表）时同步点赞状态
+watch(() => props.note, (note) => {
+  if (!note) return
+  isLiked.value = Boolean(note.isLiked)
+  likeNum.value = parseLikeTotal(note.likeTotal)
+}, { immediate: true })
 
 
 // 登录状态控制
@@ -110,35 +138,27 @@ const toggleLike = () => {
     return
   }
 
+  const noteId = props.note.id ?? props.note.noteId
+  const nextLiked = !isLiked.value
 
-  // 更新点赞数
-  if (!isLiked.value) {
-    likeNote(props.note.id).then(res => {
-      console.log('点赞了, ' + props.note.id)
-      if (res.success) {
-        // 如果是数字，就加1
-        if (!isNaN(likeCount.value)) {
-          likeCount.value = parseInt(likeCount.value) + 1
-        }
-      } else {
-        message.show(res.message)
-      }
-    })
-    
-  } else {
-    unlikeNote(props.note.id).then(res => {
-      console.log('取消点赞了, ' + props.note.id)
-      if (res.success) {
-        // 如果是数字，就减1
-        if (!isNaN(likeCount.value)) {
-          likeCount.value = Math.max(0, parseInt(likeCount.value) - 1)
-        }
-      } else {
-        message.show(res.message)
-      }
-    })
+  // 先本地更新点赞状态与数量，接口失败时回滚
+  isLiked.value = nextLiked
+  likeNum.value = Math.max(0, likeNum.value + (nextLiked ? 1 : -1))
+
+  const rollback = () => {
+    isLiked.value = !nextLiked
+    likeNum.value = Math.max(0, likeNum.value + (nextLiked ? -1 : 1))
   }
-  isLiked.value = !isLiked.value
+
+  const request = nextLiked ? likeNote(noteId) : unlikeNote(noteId)
+  request.then(res => {
+    if (!res.success) {
+      rollback()
+      message.show(res.message)
+    }
+  }).catch(() => {
+    rollback()
+  })
 }
 </script>
 
