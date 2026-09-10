@@ -43,8 +43,12 @@ export function isLikedAndCollectedData(noteId) {
     return axios.post(`${API_PREFIX}/isLikedAndCollectedData`, {noteId})
 }
 
-// 获取个人主页笔记数据
+// 获取用户主页已发布笔记列表（游标分页）
+export function getPublishedNoteList(userId, cursor) {
+    return axios.post(`${API_PREFIX}/published/list`, {userId, cursor})
+}
+
+// 获取个人主页赞过（2）、收藏（3）的笔记分页数据
 export function getProfileNotePageList(type, userId, pageNo) {
     return axios.post(`${API_PREFIX}/profile/note/list`, {type, userId, pageNo})
 }
-
