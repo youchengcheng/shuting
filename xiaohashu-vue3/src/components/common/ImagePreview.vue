@@ -88,7 +88,7 @@
             :key="index"
             class="w-1.5 h-1.5 rounded-full transition-all duration-200 bg-black/20 backdrop-blur-sm"
             :class="[
-              index === currentIndex ? 'w-3 bg-white' : 'hover:bg-white/60'
+              index === currentIndex ? 'w-3 bg-paper' : 'hover:bg-white/60'
             ]"
             @click.stop="currentIndex = index"
           />

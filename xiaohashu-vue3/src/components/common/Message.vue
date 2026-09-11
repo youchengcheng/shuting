@@ -1,10 +1,6 @@
 <template>
   <Transition name="fade">
-    <div 
-      v-if="visible"
-      class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10000] bg-[#333] text-white px-6 py-3
-       rounded-full whitespace-nowrap font-bold"
-    >
+    <div v-if="visible" class="message-toast" role="status">
       {{ message }}
     </div>
   </Transition>
@@ -20,7 +16,7 @@ const message = ref('')
 const show = (msg, duration = 2000) => {
   message.value = msg
   visible.value = true
-  
+
   setTimeout(() => {
     visible.value = false
   }, duration)
@@ -33,13 +29,35 @@ defineExpose({
 </script>
 
 <style scoped>
+.message-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 48px;
+  transform: translateX(-50%);
+  z-index: 10000;
+  max-width: 80vw;
+  padding: 10px 20px;
+  border-radius: var(--radius-control);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: var(--shadow-panel);
+}
+
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
 }
 
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+  transform: translateX(-50%) translateY(8px);
 }
-</style> 
+</style>

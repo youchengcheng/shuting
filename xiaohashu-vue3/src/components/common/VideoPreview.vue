@@ -8,7 +8,7 @@
     >
       <!-- 视频播放器容器 -->
       <div 
-        class="relative max-w-[90vw] max-h-[90vh] rounded-lg overflow-hidden bg-black"
+        class="relative max-w-[90vw] max-h-[90vh] rounded-panel overflow-hidden bg-black"
         @click.stop
       >
         <!-- 视频播放器 -->

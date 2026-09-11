@@ -6,16 +6,16 @@
     width="640px"
     @confirm="handleConfirm"
   >
-    <div class="p-6">
+    <div>
       <!-- 头像 -->
       <div class="flex items-center gap-4 mb-6">
         <img
           v-if="form.avatar" 
           :src="form.avatar" 
-          class="w-20 h-20 rounded-full object-cover border-1 border-gray-100"
+          class="w-20 h-20 rounded-full object-cover border-1 border-line"
         />
-        <span v-else class="w-20 h-20 bg-gray-100 rounded-full object-cover border-1 border-gray-100 flex items-center justify-center">
-            <svg class="w-10 h-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <span v-else class="w-20 h-20 bg-canvas-sunken rounded-full object-cover border border-line flex items-center justify-center">
+            <svg class="w-10 h-10 text-ink-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke-width="2" stroke-linecap="round"/>
               <circle cx="12" cy="7" r="4" stroke-width="2" stroke-linecap="round"/>
             </svg>
@@ -29,7 +29,7 @@
             @change="handleAvatarChange"
           />
           <button 
-            class="text-sm px-4 h-9 border border-gray-200 rounded-full text-gray-600 hover:bg-gray-50"
+            class="st-btn st-btn-ghost h-9 px-4 text-[13px]"
             @click="$refs.avatarInput.click()"
           >
             更换头像
@@ -41,53 +41,53 @@
       <div class="space-y-6">
         <!-- 昵称 -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">昵称</label>
+          <label class="block text-sm font-medium text-ink-soft mb-2">昵称</label>
           <div class="relative">
             <input
               v-model="form.nickname"
               type="text"
-              class="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#ff2442]"
+              class="st-input pr-12"
               placeholder="请输入昵称"
               maxlength="24"
               @input="updateNicknameCount"
             />
-            <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">
+            <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-ink-faint">
               {{ nicknameCount }}/24
             </span>
           </div>
-          <p class="mt-1 text-xs text-gray-500">
+          <p class="mt-1 text-xs text-ink-faint">
             请设置 2-24 个字符，不包括 @<>/ 等无效字符哦
           </p>
         </div>
 
-        <!-- 小哈书号 -->
+        <!-- 书亭号 -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">小哈书号</label>
+          <label class="block text-sm font-medium text-ink-soft mb-2">书亭号</label>
           <div class="relative">
             <input
               v-model="form.xiaohashuId"
               type="text"
-              class="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#ff2442]"
-              placeholder="请输入小哈书号"
+              class="st-input pr-12"
+              placeholder="请输入书亭号"
               maxlength="15"
               @input="updateXiaohashuIdCount"
             />
-            <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">
+            <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-ink-faint">
               {{ xiaohashuIdCount }}/15
             </span>
           </div>
-          <p class="mt-1 text-xs text-gray-500">
+          <p class="mt-1 text-xs text-ink-faint">
             6-15 个字符，仅可使用英文（必须）、数字、下划线
           </p>
         </div>
 
         <!-- 生日 -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">生日</label>
+          <label class="block text-sm font-medium text-ink-soft mb-2">生日</label>
           <div class="flex gap-3 text-sm">
             <select 
               v-model="form.birthYear"
-              class="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#ff2442] bg-white"
+              class="h-11 px-3 border border-line rounded-control bg-paper focus:outline-none focus:border-brand"
             >
               <option value="">年</option>
               <option 
@@ -98,7 +98,7 @@
             </select>
             <select 
               v-model="form.birthMonth"
-              class="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#ff2442] bg-white"
+              class="h-11 px-3 border border-line rounded-control bg-paper focus:outline-none focus:border-brand"
             >
               <option value="">月</option>
               <option 
@@ -109,7 +109,7 @@
             </select>
             <select 
               v-model="form.birthDay"
-              class="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#ff2442] bg-white"
+              class="h-11 px-3 border border-line rounded-control bg-paper focus:outline-none focus:border-brand"
             >
               <option value="">日</option>
               <option 
@@ -123,17 +123,17 @@
 
         <!-- 简介 -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">简介</label>
+          <label class="block text-sm font-medium text-ink-soft mb-2">简介</label>
           <div class="relative">
             <textarea
               v-model="form.introduction"
               rows="3"
-              class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#ff2442] resize-vertical min-h-[80px] max-h-[200px] pr-16"
+              class="st-input h-auto py-3 pr-16 resize-vertical min-h-[80px] max-h-[200px]"
               placeholder="介绍一下自己吧"
               maxlength="100"
               @input="updateIntroductionCount"
             ></textarea>
-            <span class="absolute right-3 bottom-3 text-xs text-gray-400">
+            <span class="absolute right-3 bottom-3 text-xs text-ink-faint">
               {{ introductionCount }}/100
             </span>
           </div>
@@ -141,14 +141,14 @@
 
         <!-- 性别 -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">性别</label>
+          <label class="block text-sm font-medium text-ink-soft mb-2">性别</label>
           <div class="flex gap-4">
             <label class="flex items-center cursor-pointer">
               <input
                 v-model="form.sex"
                 type="radio"
                 :value="0"
-                class="w-4 h-4 text-[#ff2442]"
+                class="w-4 h-4 accent-ink"
               />
               <span class="ml-2">女</span>
             </label>
@@ -157,7 +157,7 @@
                 v-model="form.sex"
                 type="radio"
                 :value="1"
-                class="w-4 h-4 text-[#ff2442]"
+                class="w-4 h-4 accent-ink"
               />
               <span class="ml-2">男</span>
             </label>
@@ -201,7 +201,7 @@ const form = ref({
 
 // 昵称字数计数
 const nicknameCount = ref(0)
-// 小红书号字数计数
+// 书亭号字数计数
 const xiaohashuIdCount = ref(0)
 // 简介字数计数
 const introductionCount = ref(0)
@@ -211,7 +211,7 @@ const updateNicknameCount = () => {
   nicknameCount.value = form.value.nickname.length
 }
 
-// 更新小红书号字数计数
+// 更新书亭号字数计数
 const updateXiaohashuIdCount = () => {
   xiaohashuIdCount.value = form.value.xiaohashuId.length
 }
@@ -269,7 +269,7 @@ const initFormData = () => {
     
     // 初始化昵称字数计数
     nicknameCount.value = form.value.nickname.length
-    // 初始化小红书号字数计数
+    // 初始化书亭号字数计数
     xiaohashuIdCount.value = form.value.xiaohashuId.length
     // 初始化简介字数计数
     introductionCount.value = form.value.introduction.length
@@ -331,30 +331,30 @@ const handleConfirm = () => {
     return
   }
 
-  // 小红书号验证
+  // 书亭号验证
   if (!form.value.xiaohashuId.trim()) {
-    message.show('请输入小红书号')
+    message.show('请输入书亭号')
     return
   }
   
-  // 小红书号长度验证
+  // 书亭号长度验证
   const xiaohashuId = form.value.xiaohashuId.trim()
   if (xiaohashuId.length < 6 || xiaohashuId.length > 15) {
-    message.show('小红书号长度应为 6-15 个字符')
+    message.show('书亭号长度应为 6-15 个字符')
     return
   }
 
-  // 小红书号格式验证：必须包含英文字母，且只能包含英文、数字和下划线
+  // 书亭号格式验证：必须包含英文字母，且只能包含英文、数字和下划线
   const hasLetter = /[a-zA-Z]/.test(xiaohashuId)
   const validFormat = /^[a-zA-Z0-9_]+$/.test(xiaohashuId)
 
   if (!hasLetter) {
-    message.show('小红书号必须包含英文字母')
+    message.show('书亭号必须包含英文字母')
     return
   }
 
   if (!validFormat) {
-    message.show('小红书号只能包含英文字母、数字和下划线')
+    message.show('书亭号只能包含英文字母、数字和下划线')
     return
   }
 
@@ -458,12 +458,12 @@ select {
 
 select:focus {
   outline: none;
-  border-color: #ff2442;
+  border-color: var(--color-line-strong);
 }
 
 /* 禁用状态下的输入框样式 */
 input:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--color-canvas-sunken);
   cursor: not-allowed;
 }
 </style> 

@@ -1,40 +1,38 @@
 <template>
-  <div class="category-nav flex items-center">
-    <div class="flex items-center overflow-x-auto py-2 px-4 whitespace-nowrap">
-      <!-- 全部频道 -->
-      <div 
+  <div class="category-nav">
+    <div class="category-nav__track" role="tablist" aria-label="频道">
+      <button
+        type="button"
         class="channel"
-        :class="{ 
-          'active-channel': activeChannelId === 0,
-          '': activeChannelId !== 0
-        }"
+        role="tab"
+        :aria-selected="activeChannelId === 0 ? 'true' : 'false'"
+        :class="{ 'channel--active': activeChannelId === 0 }"
         @click="handleChannelClick(0)"
       >
-        全部
-      </div>
-      
-      <!-- 动态获取的频道列表 -->
-      <div 
-        v-for="channel in channels" 
+        <span class="channel__text">推荐</span>
+      </button>
+
+      <button
+        v-for="channel in channels"
         :key="channel.id"
+        type="button"
         class="channel"
-        :class="{ 
-          'active-channel': activeChannelId === channel.id,
-          '': activeChannelId !== channel.id
-        }"
+        role="tab"
+        :aria-selected="activeChannelId === channel.id ? 'true' : 'false'"
+        :class="{ 'channel--active': activeChannelId === channel.id }"
         @click="handleChannelClick(channel.id)"
       >
-        {{ channel.name }}
-      </div>
+        <span class="channel__text">{{ channel.name }}</span>
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useChannelStore } from '@/stores/channel'
 
-const props = defineProps({
+defineProps({
   activeChannelId: {
     type: Number,
     default: 0
@@ -48,7 +46,6 @@ const channels = ref([])
 
 // 处理频道点击
 const handleChannelClick = (channelId) => {
-  // 触发自定义事件，将频道ID传递给父组件
   emit('channel-change', channelId)
 }
 
@@ -67,43 +64,73 @@ onMounted(async () => {
 
 <style scoped>
 .category-nav {
-  /* border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  background-color: #fff; */
-  height: 72px;
+  position: sticky;
+  top: var(--header-h);
+  z-index: 20;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-canvas);
 }
 
-/* 隐藏滚动条但保留功能 */
-.overflow-x-auto {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
+.category-nav__track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.overflow-x-auto::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
+.category-nav__track::-webkit-scrollbar {
+  display: none;
 }
 
 .channel {
-    height: 40px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 0 16px;
-    cursor: pointer;
-    -webkit-user-select: none;
-    user-select: none;
-    color: var(--color-secondary-label)
+  position: relative;
+  height: 44px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-ink-soft);
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--motion-fast) var(--ease-standard);
 }
 
 .channel:hover {
-    background: var(--color-active-background);
-    border-radius: 999px;
-    color: var(--color-primary-label);
+  color: var(--color-ink);
 }
 
-.active-channel {
-    background: var(--color-active-background);
-    border-radius: 999px;
-    color: var(--color-primary-label);
-    font-weight: 600;
+.channel--active {
+  color: var(--color-ink);
+  font-weight: 600;
 }
-</style> 
+
+/* 激活频道：文字下方红色短下划线（宽度贴合文字） */
+.channel--active .channel__text {
+  position: relative;
+}
+
+.channel--active .channel__text::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-brand);
+}
+
+.channel__text {
+  display: inline-block;
+}
+</style>

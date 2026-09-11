@@ -1,11 +1,7 @@
 <template>
-  <div class="relative inline-block">
+  <div class="popover-anchor">
     <!-- 触发元素插槽 -->
-    <div 
-      ref="triggerRef"
-      @mouseenter="showPopover"
-      @mouseleave="hidePopover"
-    >
+    <div ref="triggerRef" @mouseenter="showPopover" @mouseleave="hidePopover">
       <slot></slot>
     </div>
 
@@ -18,69 +14,43 @@
       leave-from-class="translate-y-0 opacity-100"
       leave-to-class="translate-y-1 opacity-0"
     >
-      <div 
+      <div
         v-if="visible"
-        class="absolute z-50 bg-white rounded-lg shadow-xl border border-gray-100 
-        p-6 w-[360px] flex flex-col gap-[16px]"
+        class="popover-panel"
         :style="popoverStyle"
         @mouseenter="showPopover"
         @mouseleave="hidePopover"
       >
+        <div class="popover-head">
+          <img :src="user.avatar" class="popover-avatar" :alt="user.name" />
 
-      <!-- @mouseleave="hidePopover" -->
-        <div class="flex gap-[12px] items-center">
-          <!-- 左侧头像 -->
-          <div class="flex-shrink-0">
-            <img 
-              :src="user.avatar" 
-              class="w-[40px] h-[40px] rounded-full border border-gray-200"
-            />
+          <div class="popover-identity">
+            <span class="popover-name">{{ user.name }}</span>
           </div>
 
-          <!-- 右侧内容区域 -->
-          <div class="flex-1 min-w-0">
-            <!-- 名字和关注按钮 -->
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-[16px] text-[#333] truncate">{{ user.name }}</span>
-              <button class="bg-[#ff2442] text-white h-[32px] w-[80px] px-[24px] 
-              text-sm rounded-full hover:opacity-90 cursor-pointer">
-                关注
-              </button>
-            </div>
+          <button type="button" class="st-btn st-btn-primary popover-follow">关注</button>
+        </div>
+
+        <p class="popover-desc">{{ user.description }}</p>
+
+        <div class="popover-stats">
+          <div class="popover-stat">
+            <span class="popover-stat__num st-num">{{ user.notes }}</span>
+            <span class="popover-stat__label">关注</span>
+          </div>
+          <div class="popover-stat">
+            <span class="popover-stat__num st-num">{{ user.followers }}</span>
+            <span class="popover-stat__label">粉丝</span>
+          </div>
+          <div class="popover-stat">
+            <span class="popover-stat__num st-num">{{ user.likes }}</span>
+            <span class="popover-stat__label">获赞与收藏</span>
           </div>
         </div>
 
-        <!-- 简介 - 和头像对齐 -->
-        <div class="text-[#333] text-sm">{{ user.description }}</div>
-
-        <!-- 用户数据 - 和头像对齐 -->
-        <div class="flex items-center justify-between text-center text-[14px]">
-          <div class="flex items-center">
-            <div class="font-medium text-[#333]">{{ user.notes }}</div>
-            <div class="interaction-info">关注</div>
-          </div>
-          <div class="flex items-center">
-            <div class="font-medium text-[#333]">{{ user.followers }}</div>
-            <div class="interaction-info">粉丝</div>
-          </div>
-          <div class="flex items-center">
-            <div class="font-medium text-[#333]">{{ user.likes }}</div>
-            <div class="interaction-info">获赞与收藏</div>
-          </div>
-        </div>
-
-        <!-- 笔记预览 - 和头像对齐 -->
-        <div class="grid grid-cols-3 gap-[8px]">
-          <div 
-            v-for="note in user.recentNotes" 
-            :key="note.id"
-            class="aspect-square rounded-sm overflow-hidden"
-          >
-            <img 
-              :src="note.cover" 
-              class="w-full h-full object-cover hover:opacity-90 transition-opacity cursor-pointer"
-              alt="note cover"
-            />
+        <div class="popover-notes">
+          <div v-for="note in user.recentNotes" :key="note.id" class="popover-note">
+            <img :src="note.cover" alt="note cover" />
           </div>
         </div>
       </div>
@@ -161,14 +131,117 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', updateBounds)
   window.removeEventListener('scroll', updateBounds)
 })
-</script> 
+</script>
 
 <style scoped>
-.interaction-info {
-    color: rgba(51, 51, 51, 0.6);
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 120%;
-    margin-left: 4px;
+.popover-anchor {
+  position: relative;
+  display: inline-block;
+}
+
+.popover-panel {
+  position: absolute;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 340px;
+  padding: 20px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.popover-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.popover-avatar {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  object-fit: cover;
+}
+
+.popover-identity {
+  flex: 1;
+  min-width: 0;
+}
+
+.popover-name {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popover-follow {
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 16px;
+  font-size: 13px;
+  border-radius: var(--radius-pill);
+}
+
+.popover-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-ink-soft);
+}
+
+.popover-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.popover-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.popover-stat__num {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.popover-stat__label {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.popover-notes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.popover-note {
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+}
+
+.popover-note img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.popover-note img:hover {
+  opacity: 0.88;
 }
 </style>

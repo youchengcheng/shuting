@@ -1,20 +1,15 @@
 <template>
-  <div class="h-screen max-w-screen-3xl mx-auto">
-    <div>
-      <!-- 顶部导航栏 -->
-      <AppHeader />
+  <div class="app-shell">
+    <AppHeader />
 
-      <div class="flex h-[calc(100vh-72px)] px-5 2xl:px-24 pt-[76px]">
-        <!-- 左侧侧边栏 -->
-        <AppSidebar />
+    <div class="app-body">
+      <AppSidebar />
 
-        <!-- 右侧内容区域 -->
-        <main class="px-5 grow ml-[320px]">
-
-          
+      <main class="app-main">
+        <div class="app-container">
           <router-view></router-view>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   </div>
 </template>
@@ -22,8 +17,46 @@
 <script setup>
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
-
 </script>
 
 <style scoped>
-</style> 
+.app-shell {
+  min-height: 100vh;
+  padding-top: var(--header-h);
+  background: var(--color-canvas);
+}
+
+.app-main {
+  padding-left: var(--sidebar-w);
+  min-width: 0;
+}
+
+.app-container {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 20px 24px 72px;
+}
+
+@media (min-width: 1536px) {
+  .app-container {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-main {
+    padding-left: 0;
+  }
+
+  .app-container {
+    padding: 16px 20px 64px;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-container {
+    padding: 12px 16px 56px;
+  }
+}
+</style>

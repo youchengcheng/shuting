@@ -14,16 +14,32 @@
         <div 
           v-for="(image, index) in images" 
           :key="index"
-          class="h-full w-full flex-shrink-0 flex items-center justify-center bg-gray-100 border-r border-gray-200"
+          class="h-full w-full flex-shrink-0 flex items-center justify-center bg-canvas-sunken border-r border-line"
         >
           <img 
+            v-if="!failedIndexes.includes(index)"
             :src="image" 
-            class="h-full w-auto object-contain cursor-zoom-in"
-            alt="note image"
+            class="h-full w-auto object-contain cursor-zoom-in" 
+            alt=""
             @load="onImageLoad"
+            @error="onImageError(index)"
             ref="imageRefs"
             @click="onImageClick"
           />
+
+          <!-- 后端存在历史失效图片地址，兜底为占位，避免出现浏览器默认的破图图标 -->
+          <span v-else class="carousel-fallback">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M5.5 15.5c2.2-.7 4.4-.1 6.5 1.6 2.1-1.7 4.3-2.3 6.5-1.6"
+                stroke="currentColor"
+                stroke-width="1.4"
+                stroke-linecap="round"
+              />
+              <path d="M12 17.1v3.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            </svg>
+            <span class="carousel-fallback__text">图片暂时无法显示</span>
+          </span>
         </div>
       </div>
     </div>
@@ -72,7 +88,7 @@
         v-for="(_, index) in images" 
         :key="index"
         class="w-1.5 h-1.5 rounded-full transition-all duration-200"
-        :class="index === currentIndex ? 'bg-white scale-125' : 'bg-white/50 hover:bg-white/80'"
+        :class="index === currentIndex ? 'bg-paper scale-125' : 'bg-white/50 hover:bg-white/80'"
         @click="currentIndex = index"
       />
     </div>
@@ -102,6 +118,14 @@ const currentIndex = ref(0)
 const imageRefs = ref([])
 const showControls = ref(false)
 const showPreview = ref(false)
+// 记录加载失败的图片下标
+const failedIndexes = ref([])
+
+const onImageError = (index) => {
+  if (!failedIndexes.value.includes(index)) {
+    failedIndexes.value = [...failedIndexes.value, index]
+  }
+}
 
 // 添加滚动节流控制
 let wheelTimeout = null
@@ -121,6 +145,7 @@ const onImageLoad = (event) => {
 
 // 监听 images 变化，重置 currentIndex
 watch(() => props.images, (newImages) => {
+  failedIndexes.value = []
   if (newImages && newImages.length) {
     currentIndex.value = 0
   }
@@ -197,6 +222,25 @@ const handleWheel = (e) => {
 </script>
 
 <style scoped>
+.carousel-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--color-ink-faint);
+}
+
+.carousel-fallback svg {
+  width: 56px;
+  height: 56px;
+  color: var(--color-line-strong);
+}
+
+.carousel-fallback__text {
+  font-size: 13px;
+}
+
 .carousel-btn {
   @apply absolute top-1/2;
   transform: translateY(-50%);
