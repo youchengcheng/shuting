@@ -1,40 +1,25 @@
 <template>
-  <Teleport to="body">
-    <!-- 遮罩层 -->
-    <div v-if="visible" class="fixed inset-0 bg-gray-800/25 z-[100]" @click="onClose"></div>
-    
-    <!-- 笔记详情 -->
-    <Transition 
-      name="zoom"
-      appear
-      @before-enter="onBeforeEnter"
-      @enter="onEnter"
-      @leave="onLeave"
-    >
-      <div v-if="visible" class="fixed inset-0 z-[101] pointer-events-none">
-        <div 
-          class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white h-[90vh] 
-          max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[70%] 2xl:max-w-[60%] w-auto rounded-lg flex overflow-hidden pointer-events-auto"
-          ref="modalRef"
-        >
-          <!-- 左侧图片区域 -->
-          <div class="h-full flex-1 flex items-center justify-center overflow-hidden">
-            <div class="h-full w-full flex items-center justify-center">
+  <div class="note-detail">
+    <!-- 左侧媒体区域 -->
+    <div class="note-detail__media">
+      <div class="note-detail__media-inner">
               <ImageCarousel v-if="currNote.type === 0" :images="currNote.imgUris || []" class="h-full w-full" />
-              <VideoPlayer v-else
-                      :video-url="currNote.videoUri" 
+              <VideoPlayer v-else-if="currNote.type === 1"
+                      :video-url="currNote.videoUri"
+                      :poster="currNote.cover"
                       :autoplay="true"
                     ></VideoPlayer>
+              <!-- 笔记类型未确定时不渲染媒体组件，避免 VideoPlayer 黑底闪现 -->
             </div>
           </div>
 
           <!-- 右侧内容区域 -->
-          <div class="w-[480px] min-w-[480px] flex flex-col bg-white">
+          <div class="note-detail__panel">
 
             <!-- 作者信息 -->
             <div 
-              class="p-[24px] flex items-center sticky top-0 bg-white"
-              :class="{'border-b border-gray-100': isScrolled}"
+              class="p-[24px] flex items-center sticky top-0 bg-paper"
+              :class="{'border-b border-line': isScrolled}"
               ref="authorInfoRef"
             >
               <router-link :to="`/user/profile/${currNote.creatorId}`">
@@ -45,15 +30,15 @@
               </router-link>
 
               <router-link :to="`/user/profile/${currNote.creatorId}`" class="ml-[12px] flex-1">
-                      <div class="font-medium text-[16px] text-gray-600 hover:text-gray-800">{{ currNote.creatorName }}</div>
+                      <div class="font-medium text-[16px] text-ink-soft hover:text-ink">{{ currNote.creatorName }}</div>
               </router-link>
               
 
               <button 
               v-if="!userStore.token || userStore.profile.userId !== currNote.creatorId"
               @click="handleFollow"
-              :class="isFollowing ? 'bg-white text-[#ff2442] border border-[#ff2442]' : 'bg-[#ff2442] text-white'"
-              class="px-6 py-2 rounded-full font-bold hover:opacity-90 w-[96px] h-[40px] cursor-pointer">
+              :class="isFollowing ? 'st-btn-ghost' : 'st-btn-primary'"
+              class="st-btn w-[96px]">
                 {{ isFollowing ? '已关注' : '关注' }}
               </button>
             </div>
@@ -66,21 +51,21 @@
             >
               <!-- 笔记正文 -->
               <div 
-                class="text-[#333] px-[24px] pb-[24px] flex-1"
+                class="text-ink px-[24px] pb-[24px] flex-1"
                 ref="contentRef"
               >
                 <h1 class="title">{{ currNote.title }}</h1>
-                <div class="note-conten whitespace-pre-wrap">{{ currNote.content }}</div>
-                <ul v-if="currNote.topicName" class="text-[#13386c] flex flex-wrap gap-2">
+                <div class="note-content whitespace-pre-wrap">{{ currNote.content }}</div>
+                <ul v-if="currNote.topicName" class="text-ink-soft flex flex-wrap gap-2">
                   <li class="cursor-pointer">#{{currNote.topicName}}</li>
                 </ul>
-                <div class="text-gray-500 text-[14px] mt-[12px]">
+                <div class="text-ink-faint text-[14px] mt-[12px]">
                   编辑于 {{ currNote.updateTime }}
                 </div>
               </div>
 
               <!-- 分割线 -->
-              <div class="h-[1px] border-b border-gray-100 mx-[24px]"></div>
+              <div class="h-[1px] border-b border-line mx-[24px]"></div>
 
               <!-- 评论区 -->
               <CommentList
@@ -98,8 +83,8 @@
             
 
             <!-- 底部互动区 -->
-            <div class="border-t border-gray-100 p-[16px]">
-              <div class="flex flex-col text-gray-500 text-[15px]">
+            <div class="border-t border-line p-[16px]">
+              <div class="flex flex-col text-ink-faint text-[15px]">
                 <!-- 评论输入区域 -->
                 <div class="flex items-center gap-2">
                   <!-- 登录提示/评论输入框 -->
@@ -108,17 +93,17 @@
                     class="content-input grow cursor-pointer"
                     @click="focusComment"
                   >
-                    <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <svg class="w-4 h-4 text-ink-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" stroke-width="2"/>
                     </svg>
-                    <span class="text-gray-500 text-sm ml-2">登录后评论</span>
+                    <span class="text-ink-faint text-sm ml-2">登录后评论</span>
                   </div>
                   
                   <!-- 已登录状态显示评论输入框 -->
                   <div 
                     v-else
-                    class="flex flex-col"
-                    :class="{ 'w-full': isInputFocused }"
+                    class="flex flex-col min-w-0"
+                    :class="{ 'w-full': isInputFocused, 'flex-1': !isInputFocused }"
                   >
                     <!-- 回复提示 - 仅在回复时显示 -->
                     <div 
@@ -127,7 +112,7 @@
                     >
                       <div class="flex items-center reply">
                         回复
-                        <span class="text-[#333] mx-1">{{ replyTo.nickname }}</span>
+                        <span class="text-ink mx-1">{{ replyTo.nickname }}</span>
                       </div>
                       <div class="reply-content line-clamp-1">
                         {{ replyTo.content }} <span v-if="replyTo.imageUrl">[图片]</span>
@@ -139,7 +124,7 @@
                       class="gap-2 rounded-full flex items-center content-input"
                       :class="{
                         'w-full px-[16px]!': isInputFocused,
-                        'w-[200px]': !isInputFocused
+                        'flex-1': !isInputFocused
                       }"
                       @click="focusComment"
                     >
@@ -153,7 +138,7 @@
                       <!-- 未聚焦时显示默认文本 -->
                       <div 
                         v-if="!isInputFocused && !commentContent" 
-                        class="text-gray-500 text-sm ml-2 whitespace-nowrap overflow-hidden text-ellipsis"
+                        class="text-ink-faint text-sm ml-2 whitespace-nowrap overflow-hidden text-ellipsis"
                       >
                         说点什么...
                       </div>
@@ -163,7 +148,7 @@
                         type="text" 
                         placeholder="说点什么..." 
                         v-model="commentContent"
-                        class="flex-1 bg-transparent focus:outline-none min-w-0 text-[#333]"
+                        class="flex-1 bg-transparent focus:outline-none min-w-0 text-ink"
                         :class="{
                           'ml-2 text-sm': !isInputFocused,
                           'text-[16px]': isInputFocused
@@ -181,41 +166,41 @@
                   </div>
 
                   <!-- 互动数据 - 仅在输入框未聚焦时显示 -->
-                  <div v-if="!isInputFocused" class="flex items-center gap-4 ml-auto text-[#333]">
-                    <div class="flex items-center gap-1 cursor-pointer hover:text-gray-800">
+                  <div v-if="!isInputFocused" class="flex items-center gap-[18px] ml-auto text-ink">
+                    <div class="flex items-center gap-1 cursor-pointer hover:text-ink">
                       <svg 
-                        class="w-[20px] h-[20px] transition-all duration-200"
-                        :class="[isNoteLiked ? 'animate-like' : 'animate-unlike']"
+                        class="action-icon w-[22px] h-[22px] transition-all duration-200"
+                        :class="[isNoteLiked ? 'animate-like is-on' : 'animate-unlike']"
                         viewBox="0 0 24 24" 
-                        :fill="isNoteLiked ? '#ff2442' : 'none'" 
-                        :stroke="isNoteLiked ? '#ff2442' : 'currentColor'"
+                        :fill="isNoteLiked ? 'currentColor' : 'none'" 
+                        stroke="currentColor"
                         @click="handleNoteLike"
                       >
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" stroke-width="2"/>
                       </svg>
-                      <span>{{ currNote.likeTotal }}</span>
+                      <span class="text-[15px] leading-none">{{ currNote.likeTotal }}</span>
                     </div>
-                    <div class="flex items-center gap-1 cursor-pointer hover:text-gray-800">
+                    <div class="flex items-center gap-1 cursor-pointer hover:text-ink">
                       <svg 
-                        class="w-[20px] h-[20px] transition-all duration-200"
-                        :class="[isNoteCollected ? 'animate-like' : 'animate-unlike']"
+                        class="action-icon w-[22px] h-[22px] transition-all duration-200"
+                        :class="[isNoteCollected ? 'animate-like is-on' : 'animate-unlike']"
                         viewBox="0 0 24 24" 
-                        :fill="isNoteCollected ? '#FF8C00' : 'none'" 
-                        :stroke="isNoteCollected ? '#FF8C00' : 'currentColor'"
+                        :fill="isNoteCollected ? 'currentColor' : 'none'" 
+                        stroke="currentColor"
                         @click="handleNoteCollect"
                       >
                         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                       </svg>
-                      <span>{{ currNote.collectTotal }}</span>
+                      <span class="text-[15px] leading-none">{{ currNote.collectTotal }}</span>
                     </div>
                     <div 
-                      class="flex items-center gap-1 cursor-pointer hover:text-gray-800"
+                      class="flex items-center gap-1 cursor-pointer hover:text-ink"
                       @click="focusComment"
                     >
-                      <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <svg class="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" stroke-width="2"/>
                       </svg>
-                      <span class="text-sm">{{ currNote.commentTotal }}</span>
+                      <span class="text-[15px] leading-none">{{ currNote.commentTotal }}</span>
                     </div>
                   </div>
                 </div>
@@ -225,7 +210,7 @@
                   <div class="flex items-center gap-1">
                     <div class="relative">
                       <button 
-                        class="p-[10px] hover:text-[#333] hover:bg-gray-100 rounded-full"
+                        class="p-[10px] hover:text-ink hover:bg-canvas-sunken rounded-full"
                         @click="toggleEmojiPicker"
                         ref="emojiButtonRef"
                       >
@@ -240,7 +225,7 @@
                       <!-- 表情选择弹出框 -->
                       <div 
                         v-if="showEmojiPicker" 
-                        class="emoji-picker border border-gray-200"
+                        class="emoji-picker border border-line"
                         ref="emojiPickerRef"
                       >
                         <div class="emoji-grid">
@@ -259,7 +244,7 @@
                     <!-- 上传图片按钮 -->
                     <div class="relative">
                       <button 
-                        class="p-[10px] hover:text-[#333] hover:bg-gray-100 rounded-full"
+                        class="p-[10px] hover:text-ink hover:bg-canvas-sunken rounded-full"
                         @click="triggerFileUpload"
                       >
                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -280,15 +265,14 @@
                   <div class="flex items-center gap-2">
                     <!-- 发送按钮 -->
                     <button 
-                      class="w-[64px] h-[40px] text-[16px] text-white bg-[#ff2442] 
-                      rounded-full font-bold cursor-pointer"
+                      class="st-btn st-btn-primary w-[64px] h-10 text-[15px]"
                       :class="{'opacity-50': !commentContent.trim() && !commentImage}"
                       @click="handlePublishComment"
                     >
                       发送
                     </button>
-                    <button class="border border-gray-200 w-[64px] h-[40px] text-[16px] 
-                    font-bold text-gray-600 hover:text-gray-800 hover:bg-gray-100 
+                    <button class="border border-line w-[64px] h-[40px] text-[15px] 
+                    font-bold text-ink-soft hover:text-ink hover:bg-canvas-sunken 
                     rounded-full cursor-pointer" @click="onCancel">
                       取消
                     </button>
@@ -297,10 +281,7 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+  </div>
 </template>
 
 <script setup>
@@ -312,16 +293,18 @@ import VideoPlayer from '@/components/common/VideoPlayer.vue'
 import { getNoteDetail, likeNote, unlikeNote, collectNote, uncollectNote, isLikedAndCollectedData } from '@/api/note' // 获取笔记详情的API
 import { getCommentList, publishComment, getChildCommentList, likeComment, unlikeComment } from '@/api/comment'
 import { followUser, unfollowUser } from '@/api/relation'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { message } from '@/utils/message'
 import { uploadFile } from '@/api/file' // 导入文件上传API
 
+const router = useRouter()
 const userStore = useUserStore()
 
 const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false
+  noteId: {
+    type: [String, Number],
+    default: ''
   },
   note: {
     type: Object,
@@ -341,62 +324,6 @@ const authorInfoRef = ref(null)
 const contentRef = ref(null)
 const scrollContainerRef = ref(null)
 
-// 动画相关状态
-let animation = null
-
-// 在组件卸载前清除所有动画
-onBeforeUnmount(() => {
-  if (animation) {
-    animation.kill()
-    animation = null
-  }
-})
-
-// 关闭模态框
-const onClose = () => {
-  emit('update:visible', false)
-}
-
-// 动画相关方法
-const onBeforeEnter = (el) => {
-  if (modalRef.value) {
-    gsap.set(modalRef.value, {
-      scale: 0.8,
-      opacity: 0
-    })
-  }
-}
-
-const onEnter = (el, done) => {
-  nextTick(() => {
-    if (modalRef.value) {
-      animation = gsap.to(modalRef.value, {
-        scale: 1,
-        opacity: 1,
-        duration: 0.3,
-        ease: 'back.out(1.7)',
-        onComplete: done
-      })
-    } else {
-      done()
-    }
-  })
-}
-
-const onLeave = (el, done) => {
-  if (modalRef.value) {
-    animation = gsap.to(modalRef.value, {
-      scale: 0.8,
-      opacity: 0,
-      duration: 0.2,
-      ease: 'power1.in',
-      onComplete: done
-    })
-  } else {
-    done()
-  }
-}
-
 const isScrolled = ref(false)
 
 const handleScroll = (e) => {
@@ -410,7 +337,6 @@ const handleScroll = (e) => {
 
   // 当滚动到距离底部 50px 时触发加载
   if (scrollHeight - scrollTop - clientHeight < 50) {
-    console.log('已经滚动到最后一条评论，准备加载下一页数据...')
     loadMoreComments()
   }
 }
@@ -437,14 +363,12 @@ const mapCommentItem = (comment) => {
 const isLoadingMoreComments = ref(false)
 
 const loadMoreComments = () => {
-  console.log('加载更多评论')
   if (currCommentPageNo.value >= totalCommentPage.value || isLoadingMoreComments.value) return
   
   isLoadingMoreComments.value = true
   const nextPage = currCommentPageNo.value + 1
   
   getCommentList(currNoteId.value, nextPage).then(res => {
-    console.log('加载更多评论结果:', res)
     if (res.success) {
       // 过滤掉可能重复的评论
       const existingCommentIds = new Set(comments.value.map(c => c.commentId))
@@ -493,7 +417,6 @@ const focusComment = () => {
 // 回复一级或二级评论。CommentItem 已经把实际评论对象向上透传，
 // 不需要依赖不存在的 isReply/replies 字段来判断层级。
 const onReplyClick = (comment) => {
-  console.log('回复点击', comment)
   if (!comment?.commentId) return
 
   if (!isLoggedIn.value) {
@@ -541,15 +464,15 @@ const onCancel = () => {
   }
 }
 
-// 监听模态框可见性变化
-watch(() => props.visible, (newVisible) => {
-  if (newVisible && props.note && props.note.id) {
-    // 模态框打开时加载数据
-    currNoteId.value = props.note.id
+// 监听笔记 ID 变化（由路由参数驱动）
+watch(() => props.noteId, (newNoteId) => {
+  if (newNoteId) {
+    // 进入详情时加载数据
+    currNoteId.value = newNoteId
     currNote.value = { ...props.note }
     
     // 加载笔记详情
-    getNoteDetail(props.note.id).then(res => {
+    getNoteDetail(props.noteId).then(res => {
       if (res.success) {
         // 详情接口不返回点赞/收藏/评论数，从卡片数据兜底初始化
         currNote.value = {
@@ -563,7 +486,7 @@ watch(() => props.visible, (newVisible) => {
     })
     
     // 加载评论列表第一页
-    getCommentList(props.note.id, 1).then(res => {
+    getCommentList(props.noteId, 1).then(res => {
       if (res.success) {
         comments.value = (res.data || []).map(mapCommentItem)
       commentTotal.value = res.totalCount
@@ -575,7 +498,7 @@ watch(() => props.visible, (newVisible) => {
       }
     })
 
-    isLikedAndCollectedData(props.note.id).then(res => {
+    isLikedAndCollectedData(props.noteId).then(res => {
       if (res.success) {
         isNoteLiked.value = res.data.isLiked
         isNoteCollected.value = res.data.isCollected
@@ -599,7 +522,7 @@ watch(() => props.visible, (newVisible) => {
     isNoteCollected.value = false
     isFollowing.value = false
   }
-})
+}, { immediate: true })
 
 // 表情选择相关
 const showEmojiPicker = ref(false)
@@ -724,7 +647,6 @@ const findParentComment = (commentId, commentsList) => {
 
 // 修改发布评论函数
 const handlePublishComment = () => {
-  console.log('发布评论, ' + currNoteId.value)
   
   // 检查是否有内容或图片
   if (!commentContent.value.trim() && !commentImage.value) {
@@ -811,11 +733,9 @@ const handlePublishComment = () => {
         if (scrollContainerRef.value) {
           // 只有发布一级评论（直接评论笔记）时才滚动到评论区顶部
           if (!replyTo.value) {
-            console.log('一级评论发布成功后需要滚动到评论区顶部')
             const contentHeight = contentRef.value ? contentRef.value.offsetHeight : 0
             scrollContainerRef.value.scrollTop = contentHeight
           } else {
-            console.log('二级评论发布成功后不需要滚动，保持当前位置即可')
             // 二级评论发布成功后不需要滚动，保持当前位置即可
           }
           replyTo.value = null  // 清除回复对象
@@ -876,7 +796,6 @@ const loadChildComments = (parentComment, pageNo = 1) => {
 
 // 处理展开回复事件
 const handleExpandReplies = (comment) => {
-  console.log('展开评论的回复列表:', comment)
   loadChildComments(comment)
 }
 
@@ -892,7 +811,6 @@ const handleNoteLike = () => {
   if (!isNoteLiked.value) {
     likeNote(currNoteId.value).then(res => {
     if (res.success) {
-      console.log('点赞成功')
       isNoteLiked.value = !isNoteLiked.value
       currNote.value.likeTotal++
       } else {
@@ -904,7 +822,6 @@ const handleNoteLike = () => {
   
   unlikeNote(currNoteId.value).then(res => {
     if (res.success) {
-      console.log('取消点赞成功')
       isNoteLiked.value = !isNoteLiked.value
       currNote.value.likeTotal--
     }
@@ -915,11 +832,9 @@ const handleNoteLike = () => {
 const handleCommentLike = ({ comment, liked }) => {
 
 
-  console.log('评论点赞:', comment.commentId, liked)
   if (liked) {
     likeComment(comment.commentId).then(res => {
     if (res.success) {
-      console.log('点赞成功')
       // 直接更新传入的 comment 对象的点赞数
       comment.likeTotal++
       } else {
@@ -931,7 +846,6 @@ const handleCommentLike = ({ comment, liked }) => {
   
   unlikeComment(comment.commentId).then(res => {
     if (res.success) {
-      console.log('取消点赞成功')
       comment.likeTotal--
     }
   })
@@ -949,7 +863,6 @@ const handleNoteCollect = () => {
   if (!isNoteCollected.value) {
     collectNote(currNoteId.value).then(res => {
       if (res.success) {
-        console.log('收藏成功')
         isNoteCollected.value = !isNoteCollected.value
         currNote.value.collectTotal++
       } else {
@@ -961,7 +874,6 @@ const handleNoteCollect = () => {
 
   uncollectNote(currNoteId.value).then(res => {
     if (res.success) {
-      console.log('取消收藏成功')
       isNoteCollected.value = !isNoteCollected.value
       currNote.value.collectTotal--
     }
@@ -969,7 +881,6 @@ const handleNoteCollect = () => {
 }
 
 const handleFollow = () => {
-  console.log('关注用户:', currNote.value.creatorId)
   if (!userStore.token) {
     showLoginModal.value = true
     return
@@ -995,7 +906,7 @@ const handleFollow = () => {
 
 /* 防止图片溢出容器 */
 img {
-  max-height: 90vh;
+  max-height: 100%;
   width: auto;
 }
 
@@ -1006,14 +917,22 @@ img {
     line-height: 140%;
 }
 
+/* 正文：15px / 1.75 行高，贴近小红书的阅读密度 */
+.note-content {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--color-ink);
+  word-break: break-word;
+}
+
 .content-input {
-  caret-color: #ff2442;
+  caret-color: var(--color-brand);
   margin: 0px;
   height: 40px;  /* 固定高度 */
-  background-color: rgba(0, 0, 0, 0.03);
+  background-color: var(--color-canvas-sunken);
   border: none;
   padding: 0 10px;  /* 调整内边距 */
-  border-radius: 20px;
+  border-radius: var(--radius-control);
   outline: none;
   display: flex;
   align-items: center;
@@ -1035,12 +954,12 @@ img {
 }
 
 .reply {
-    color: rgba(51, 51, 51, 0.6);
+    color: var(--color-ink-faint);
     font-size: 14px;
 }
 
 .reply-content {
-    color: rgba(51, 51, 51, 0.8);
+    color: var(--color-ink-soft);
     font-size: 14px;
     width: 100%;
     margin-top: 4px;
@@ -1056,7 +975,7 @@ input::placeholder {
 
 /* 聚焦时显示 placeholder */
 input:focus::placeholder {
-    color: rgba(51, 51, 51, 0.6);
+    color: var(--color-ink-faint);
 }
 
 /* 修改图片样式，确保图片适应容器 */
@@ -1067,11 +986,19 @@ input:focus::placeholder {
   justify-content: center;
 }
 
+/* 详情页媒体区：白底 + 图片完整居中展示 */
 :deep(.carousel-image) {
+  width: 100%;
+  height: 100%;
   max-width: 100%;
-  max-height: 90vh;
+  max-height: 100%;
   object-fit: contain;
   object-position: center;
+}
+
+:deep(.note-detail__media .bg-canvas-sunken) {
+  background: var(--color-paper) !important;
+  border-right: none !important;
 }
 
 /* 表情选择器样式 */
@@ -1080,9 +1007,9 @@ input:focus::placeholder {
   bottom: 45px;
   left: 0;
   max-height: 280px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  background-color: var(--color-paper);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
   padding: 10px;
   z-index: 100;
   overflow-y: auto;
@@ -1107,7 +1034,7 @@ input:focus::placeholder {
 }
 
 .emoji-item:hover {
-  background-color: #f5f5f5;
+  background-color: var(--color-canvas-sunken);
 }
 
 /* 点赞动画效果 */
@@ -1157,6 +1084,11 @@ input:focus::placeholder {
   transform-origin: center;
 }
 
+/* 点赞 / 收藏激活态：填充与描边统一跟随品牌令牌 */
+.is-on {
+  color: var(--color-brand);
+}
+
 /* 防止动画重复播放 */
 .animate-like, .animate-unlike {
   animation-fill-mode: forwards;
@@ -1168,4 +1100,58 @@ input:focus::placeholder {
   display: inline-block;
   text-align: left;
 }
-</style> 
+
+/* ===== 详情页外壳（依附于弹层卡片，保留原有内部滚动逻辑） ===== */
+.note-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 460px;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-paper);
+}
+
+.note-detail__media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--color-paper);
+}
+
+.note-detail__media-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.note-detail__panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-paper);
+  border-left: 1px solid var(--color-line);
+}
+
+@media (max-width: 1023px) {
+  .note-detail {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 0;
+  }
+
+  .note-detail__media {
+    height: 56vh;
+  }
+
+  .note-detail__panel {
+    border-left: none;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .note-detail__panel :deep(.overflow-y-auto) {
+    overflow: visible;
+  }
+}
+</style>

@@ -1,65 +1,33 @@
 <template>
   <Teleport to="body">
-    <!-- 遮罩层 -->
-    <div 
-      v-if="visible" 
-      class="fixed inset-0 bg-black/25 backdrop-blur-sm z-[100]"
-      @click="onClickMask"
-    ></div>
-    
-    <!-- 模态框 -->
+    <div v-if="visible" class="modal-mask" @click="onClickMask"></div>
+
     <Transition
       enter-active-class="transition duration-200 ease-out"
-      enter-from-class="transform scale-95 opacity-0"
-      enter-to-class="transform scale-100 opacity-100"
+      enter-from-class="opacity-0 translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
       leave-active-class="transition duration-150 ease-in"
-      leave-from-class="transform scale-100 opacity-100"
-      leave-to-class="transform scale-95 opacity-0"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 translate-y-2"
     >
-      <div 
-        v-if="visible" 
-        class="fixed inset-0 z-[101] flex items-center justify-center p-4"
-      >
-        <div 
-          class="bg-white rounded-lg shadow-xl max-h-[90vh] flex flex-col"
-          :style="{ width: width }"
-          @click.stop
-        >
-          <!-- 标题栏 -->
-          <div class="p-6 flex items-center justify-between border-b border-gray-100">
-            <h2 class="text-[18px] font-bold text-gray-800">{{ title }}</h2>
-            <button 
-              class="w-8 h-8 flex items-center justify-center hover:bg-gray-100/80 rounded-full transition-colors"
-              @click="onClose"
-            >
-              <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M18 6L6 18M6 6l12 12" stroke-width="2" stroke-linecap="round"/>
+      <div v-if="visible" class="modal-layer">
+        <div class="modal-panel" :style="{ width: width }" role="dialog" aria-modal="true" @click.stop>
+          <div class="modal-header">
+            <h2 class="st-section-title">{{ title }}</h2>
+            <button type="button" class="modal-close" aria-label="关闭" @click="onClose">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
               </svg>
             </button>
           </div>
 
-          <!-- 内容区域 -->
-          <div class="flex-1 overflow-y-auto">
+          <div class="modal-body">
             <slot></slot>
           </div>
 
-          <!-- 底部按钮区域 -->
-          <div 
-            v-if="showFooter"
-            class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3"
-          >
-            <button 
-              class="cursor-pointer px-6 h-10 font-bold rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50"
-              @click="onClose"
-            >
-              取消
-            </button>
-            <button 
-              class="cursor-pointer px-6 h-10 font-bold rounded-full bg-[#ff2442] text-white hover:opacity-90"
-              @click="$emit('confirm')"
-            >
-              确定
-            </button>
+          <div v-if="showFooter" class="modal-footer">
+            <button type="button" class="st-btn st-btn-ghost" @click="onClose">取消</button>
+            <button type="button" class="st-btn st-btn-primary" @click="$emit('confirm')">确定</button>
           </div>
         </div>
       </div>
@@ -105,7 +73,6 @@ const onClickMask = () => {
   }
 }
 
-// 处理 ESC 按键
 const handleEscKey = (e) => {
   if (e.key === 'Escape' && props.visible) {
     onClose()
@@ -122,22 +89,82 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 自定义滚动条样式 */
-.overflow-y-auto {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgb(20 17 14 / 0.32);
 }
 
-.overflow-y-auto::-webkit-scrollbar {
-  width: 6px;
+.modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 101;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: none;
 }
 
-.overflow-y-auto::-webkit-scrollbar-track {
+.modal-panel {
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+  max-height: 90vh;
+  pointer-events: auto;
+  background: var(--color-paper);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-control);
   background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
 }
 
-.overflow-y-auto::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 3px;
+.modal-close:hover {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
 }
-</style> 
+
+.modal-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--color-line);
+}
+</style>

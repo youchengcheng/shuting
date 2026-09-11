@@ -1,18 +1,10 @@
 <template>
-  <Transition
-    name="fade"
-    appear
-  >
-    <div 
-      v-if="visible" 
-      class="loading-overlay pb-5"
-    >
-      <div class="spinner-container">
-        <div class="spinner"></div>
-        <div v-if="text" class="loading-text">{{ text }}</div>
-      </div>
+  <div v-if="visible" class="loading-overlay">
+    <div class="spinner-container">
+      <div class="spinner" role="progressbar" aria-label="加载中"></div>
+      <div v-if="text" class="spinner-text">{{ text }}</div>
     </div>
-  </Transition>
+  </div>
 </template>
 
 <script setup>
@@ -47,7 +39,7 @@ const show = () => {
     clearTimeout(hideTimer)
     hideTimer = null
   }
-  
+
   // 记录显示开始时间
   showStartTime = Date.now()
   visible.value = true
@@ -57,10 +49,10 @@ const show = () => {
 const hide = () => {
   // 记录隐藏请求时间
   hideRequestTime = Date.now()
-  
+
   // 计算已显示时间
   const elapsedTime = hideRequestTime - showStartTime
-  
+
   // 如果已显示时间小于最小持续时间，则延迟隐藏
   if (elapsedTime < props.minDuration) {
     const remainingTime = props.minDuration - elapsedTime
@@ -84,13 +76,11 @@ defineExpose({
 <style scoped>
 .loading-overlay {
   width: 100%;
-  height: 100%;
-  z-index: 9999;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(2px);
+  padding: 48px 0;
 }
 
 .spinner-container {
@@ -98,40 +88,26 @@ defineExpose({
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 12px;
 }
 
 .spinner {
-  width: 25px;
-  height: 25px;
-  border: 3px solid rgba(255, 36, 66, 0.2);
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgb(20 17 14 / 0.12);
+  border-top-color: var(--color-ink);
   border-radius: 50%;
-  border-top-color: #ff2442;
-  animation: spin 1s ease-in-out infinite;
+  animation: spin 0.9s linear infinite;
 }
 
+.spinner-text {
+  font-size: 13px;
+  color: var(--color-ink-faint);
+}
 
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
-
-/* 过渡动画 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.loading-text {
-    font-size: 12px;
-    line-height: 18px;
-    text-align: center;
-    color: var(--color-tertiary-label);
-    margin-top: 10px;
-}
-</style> 
+</style>

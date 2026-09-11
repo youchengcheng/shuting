@@ -1,14 +1,14 @@
 <template>
-  <div class="relative">
+  <div class="topic-selector">
     <!-- 话题输入框 -->
-    <div class="flex items-center border-b border-gray-100 py-3">
-      <span class="text-[#ff2442] text-[14px] font-medium mr-2">#</span>
+    <div class="topic-input-row">
+      <span class="topic-hash">#</span>
       <input
         ref="inputRef"
         v-model="keyword"
         type="text"
         placeholder="搜索添加话题"
-        class="flex-1 text-[14px] focus:outline-none"
+        class="topic-input"
         @input="onInput"
         @keydown.enter="onEnter"
         @keydown.backspace="onBackspace"
@@ -16,42 +16,33 @@
     </div>
 
     <!-- 已选话题展示 -->
-    <div class="flex flex-wrap gap-2 mt-3">
-      <div
-        v-for="topic in selectedTopics"
-        :key="topic.id"
-        class="px-3 py-1.5 bg-gray-50 rounded-full text-[14px] text-gray-800 flex items-center gap-1"
-      >
-        <span class="text-[#ff2442]">#</span>
+    <div v-if="selectedTopics.length" class="topic-chips">
+      <div v-for="topic in selectedTopics" :key="topic.id" class="topic-chip">
+        <span class="topic-chip__hash">#</span>
         {{ topic.name }}
-        <button 
-          class="ml-1 p-0.5 hover:bg-gray-200 rounded-full"
-          @click="removeTopic(topic)"
-        >
-          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M18 6L6 18M6 6l12 12" stroke-width="2" stroke-linecap="round"/>
+        <button type="button" class="topic-chip__remove" aria-label="移除话题" @click="removeTopic(topic)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <path d="M18 6L6 18M6 6l12 12" stroke-width="2" stroke-linecap="round" />
           </svg>
         </button>
       </div>
     </div>
 
     <!-- 搜索结果下拉框 -->
-    <div 
-      v-if="showDropdown && suggestions.length" 
-      class="absolute left-0 right-0 top-[100%] bg-white rounded-lg shadow-lg mt-1 py-2 max-h-[300px] overflow-auto z-10"
-    >
-      <div
+    <div v-if="showDropdown && suggestions.length" class="topic-dropdown">
+      <button
         v-for="topic in suggestions"
         :key="topic.id"
-        class="px-4 py-2 hover:bg-gray-50 cursor-pointer flex items-center"
+        type="button"
+        class="topic-option"
         @click="selectTopic(topic)"
       >
-        <span class="text-[#ff2442] mr-1">#</span>
-        <div>
-          <div class="text-[14px] text-gray-800">{{ topic.name }}</div>
-          <div class="text-[12px] text-gray-400">{{ topic.noteCount }}个笔记</div>
-        </div>
-      </div>
+        <span class="topic-option__hash">#</span>
+        <span class="topic-option__main">
+          <span class="topic-option__name">{{ topic.name }}</span>
+          <span class="topic-option__count st-num">{{ topic.noteCount }} 篇笔记</span>
+        </span>
+      </button>
     </div>
   </div>
 </template>
@@ -150,4 +141,141 @@ const onBackspace = (e) => {
     emit('update:modelValue', selectedTopics.value)
   }
 }
-</script> 
+</script>
+
+<style scoped>
+.topic-selector {
+  position: relative;
+}
+
+.topic-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.topic-hash {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-ink-faint);
+}
+
+.topic-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--color-ink);
+}
+
+.topic-input::placeholder {
+  color: var(--color-ink-faint);
+}
+
+.topic-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.topic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 10px 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.topic-chip__hash {
+  color: var(--color-ink-faint);
+}
+
+.topic-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.topic-chip__remove:hover {
+  background: var(--color-line);
+  color: var(--color-ink);
+}
+
+.topic-chip__remove svg {
+  width: 12px;
+  height: 12px;
+}
+
+.topic-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 10;
+  margin-top: 4px;
+  padding: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-panel);
+}
+
+.topic-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+
+.topic-option:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.topic-option__hash {
+  color: var(--color-ink-faint);
+}
+
+.topic-option__main {
+  display: flex;
+  flex-direction: column;
+}
+
+.topic-option__name {
+  font-size: 14px;
+  color: var(--color-ink);
+}
+
+.topic-option__count {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+</style>

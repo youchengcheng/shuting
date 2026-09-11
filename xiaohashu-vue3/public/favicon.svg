@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="书亭">
+  <rect width="24" height="24" rx="7" fill="#ff2442" />
+  <g
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="2.4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M5.6 10.4 12 5.9l6.4 4.5" />
+    <path d="M5.6 14.25c2.3-.62 4.43-.02 6.4 1.5 1.97-1.52 4.1-2.12 6.4-1.5" />
+    <path d="M12 15.75v3.85" />
+  </g>
+</svg>

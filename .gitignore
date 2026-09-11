@@ -44,7 +44,6 @@ dependency-reduced-pom.xml
 .env
 .env.local
 .env.*.local
-.env.*.local
 
 # Spring Boot 生产 / 密钥 / 本地开发配置
 # （dev 配置含数据库密码、AccessKey 等敏感信息，不纳入版本管理）
@@ -112,3 +111,21 @@ $RECYCLE.BIN/
 #  文档构建产物
 # ============================================================
 *.pdf
+
+# ============================================================
+#  AI / E2E 测试运行时缓存（浏览器调试数据，不提交）
+# ============================================================
+# Codex / E2E 自动化测试缓存（Edge CDP 调试数据、扩展、数据库等）
+.codex-e2e/
+.codex/
+*.codex-e2e
+
+# Playwright / Puppeteer 等浏览器自动化缓存
+.playwright/
+.puppeteer/
+edge-cdp/
+
+# 测试覆盖率 / 快照产物
+**/test-results/
+**/playwright-report/
+**/.cache/

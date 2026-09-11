@@ -30,6 +30,11 @@ const router = createRouter({
           component: () => import('@/views/SearchResult.vue')
         },
         {
+          path: '/note/:noteId',
+          name: 'NoteDetail',
+          component: () => import('@/views/NoteDetailPage.vue')
+        },
+        {
           path: '/user/:userId/relation',
           name: 'RelationList',
           component: () => import('@/views/RelationList.vue')

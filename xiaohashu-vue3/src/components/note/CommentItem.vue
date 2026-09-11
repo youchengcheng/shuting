@@ -1,121 +1,84 @@
 <template>
-  <div 
-    :class="[
-      !isReply && 'p-[8px]',
-      !isReply && 'mb-[16px]',
-      comment.isNewComment && 'new-comment-animation'
-    ]"
-    class="flex py-[8px]"
-  >
-    <!-- <UserPopover :user="comment.author">
-      <img 
-        :src="comment.avatar" 
-        :class="[
-          'rounded-full cursor-pointer',
-          isReply ? 'w-[24px] h-[24px]' : 'w-[40px] h-[40px]'
-        ]"
-      />
-    </UserPopover> -->
-    <img 
-        :src="comment.avatar" 
-        :class="[
-          'rounded-full cursor-pointer',
-          isReply ? 'w-[24px] h-[24px]' : 'w-[40px] h-[40px]'
-        ]"
-      />
+  <div class="comment-item" :class="{ 'comment-item--reply': isReply, 'new-comment-animation': comment.isNewComment }">
+    <img :src="comment.avatar" class="comment-item__avatar" :alt="comment.nickname" />
 
-    <div class="flex-1 ml-[12px]">
+    <div class="comment-item__body">
       <!-- 评论者信息 -->
-      <div class="flex items-center justify-between">
-        <div>
-          <!-- <UserPopover :user="comment.author">
-            <span class="name cursor-pointer">{{ comment.nickname }}</span>
-          </UserPopover> -->
-          <span class="name cursor-pointer">{{ comment.nickname }}</span>
-        </div>
-      </div>
-      
+      <span class="comment-item__name">{{ comment.nickname }}</span>
+
       <!-- 评论内容 -->
-      <div class="content">
-        <span v-if="comment.replyUserName">回复 <span class="reply-nickname">{{ comment.replyUserName }}</span> :</span>
+      <p class="comment-item__content">
+        <span v-if="comment.replyUserName" class="comment-item__reply">回复 {{ comment.replyUserName }}：</span>
         {{ comment.content }}
-      </div>
+      </p>
 
       <!-- 评论图片 -->
-      <div v-if="comment.imageUrl" class="mt-[8px]">
-        <img 
-          :src="comment.imageUrl" 
-          class="w-[120px] rounded-lg object-cover cursor-zoom-in hover:brightness-80"
-          @click="showPreview = true"
-        />
+      <div v-if="comment.imageUrl" class="comment-item__image">
+        <img :src="comment.imageUrl" alt="评论图片" @click="showPreview = true" />
       </div>
 
       <!-- 图片预览 -->
-      <ImagePreview
-        v-model:visible="showPreview"
-        :images="[comment.imageUrl]"
-      />
+      <ImagePreview v-model:visible="showPreview" :images="[comment.imageUrl]" />
 
-      <div class="info my-[8px]">{{ comment.createTime }}</div>
+      <div class="comment-item__time st-num">{{ comment.createTime }}</div>
 
       <!-- 评论底部操作区 -->
-      <div class="flex items-center gap-2 text-gray-500 text-[12px] interactions">
-        
+      <div class="comment-item__actions">
         <!-- 点赞 -->
-        <div 
-          class="flex items-center gap-1 cursor-pointer hover:text-gray-800 ml-[2px]"
-          @click="toggleLike"
-        >
-          <svg 
-            class="w-[16px] h-[16px] transition-all duration-200"
-            :class="[isLiked ? 'animate-like' : 'animate-unlike']"
-            viewBox="0 0 24 24" 
-            :fill="isLiked ? '#ff2442' : 'none'" 
-            :stroke="isLiked ? '#ff2442' : 'currentColor'"
+        <button type="button" class="comment-action" :class="{ 'comment-action--liked': isLiked }" @click="toggleLike">
+          <svg
+            class="comment-action__icon"
+            :class="isLiked ? 'animate-like' : 'animate-unlike'"
+            viewBox="0 0 24 24"
+            :fill="isLiked ? 'currentColor' : 'none'"
+            stroke="currentColor"
+            aria-hidden="true"
           >
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" stroke-width="2"/>
+            <path
+              d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+              stroke-width="1.8"
+            />
           </svg>
-          <span :class="{ 'text-[#ff2442]': isLiked }">{{ comment.likeTotal }}</span>
-        </div>
+          <span class="st-num">{{ comment.likeTotal }}</span>
+        </button>
 
         <!-- 回复 -->
-        <div 
-          class="flex items-center gap-1 cursor-pointer hover:text-gray-800"
-          @click="onReplyClick"
-        >
-          <svg class="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" stroke-width="2"/>
+        <button type="button" class="comment-action" @click="onReplyClick">
+          <svg class="comment-action__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <path
+              d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+              stroke-width="1.8"
+            />
           </svg>
           <span>回复</span>
-        </div>
+        </button>
       </div>
 
       <!-- 子评论区域 -->
       <template v-if="comment.childCommentTotal > 0">
-        <!-- 已加载的子评论列表 -->
-        <div v-if="comment.childComments && comment.childComments.length > 0" class="mt-2">
-          <div>
-            <CommentItem 
-              v-for="(childComment, index) in comment.childComments" 
-              :key="index"
-              :comment="childComment"
-              :is-reply="true"
-              @reply="$emit('reply', $event)"
-              @like="$emit('like', $event)"
-            />
-          </div>
+        <div v-if="comment.childComments && comment.childComments.length > 0" class="comment-item__children">
+          <CommentItem
+            v-for="(childComment, index) in comment.childComments"
+            :key="index"
+            :comment="childComment"
+            :is-reply="true"
+            @reply="$emit('reply', $event)"
+            @like="$emit('like', $event)"
+          />
         </div>
-        
-        <!-- 展开回复按钮 -->
-        <div 
-          v-if="comment.childCommentTotal > 1 && 
-                (!comment.childComments || comment.childComments.length < comment.childCommentTotal) && 
-                comment.hasMoreChildComments !== false"
-          class="show-more mt-2"
+
+        <button
+          v-if="
+            comment.childCommentTotal > 1 &&
+            (!comment.childComments || comment.childComments.length < comment.childCommentTotal) &&
+            comment.hasMoreChildComments !== false
+          "
+          type="button"
+          class="comment-item__more"
           @click="handleExpandReplies(comment)"
         >
           {{ comment.childComments?.length > 1 ? '展开更多回复' : `展开 ${comment.childCommentTotal - 1} 条回复` }}
-        </div>
+        </button>
       </template>
     </div>
   </div>
@@ -168,58 +131,146 @@ const handleExpandReplies = (comment) => {
 </script>
 
 <style scoped>
-.name {
-    color: rgba(51, 51, 51, 0.6);
-    line-height: 18px;
-    font-size: 14px;
+.comment-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
 }
 
-.name:hover {
-    color: rgba(51, 51, 51, 0.8);
+.comment-item--reply {
+  padding: 6px 0;
 }
 
-.content {
-    margin-top: 4px;
-    line-height: 140%;
-    color: #333;
-    font-size: 14px;
+.comment-item:not(.comment-item--reply) {
+  margin-bottom: 8px;
 }
 
-
-.info {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    font-size: 12px;
-    line-height: 16px;
-    color: rgba(51, 51, 51, 0.6);
+.comment-item__avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  background: var(--color-canvas-sunken);
+  object-fit: cover;
+  cursor: pointer;
 }
 
-.interactions {
-    font-size: 12px;
-    line-height: 16px;
-    color: rgba(51, 51, 51, 0.6);
+.comment-item--reply .comment-item__avatar {
+  width: 28px;
+  height: 28px;
 }
 
-.interactions {
-  color: rgba(51, 51, 51, 0.6);
+.comment-item__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.comment-item__name {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.comment-item__name:hover {
+  color: var(--color-ink);
+}
+
+.comment-item__content {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-ink);
+  word-break: break-word;
+}
+
+.comment-item__reply {
+  color: var(--color-ink-soft);
+}
+
+.comment-item__image img {
+  margin-top: 8px;
+  width: 120px;
+  border-radius: var(--radius-control);
+  object-fit: cover;
+  cursor: zoom-in;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.comment-item__image img:hover {
+  opacity: 0.88;
+}
+
+.comment-item__time {
+  margin: 8px 0;
   font-size: 12px;
   line-height: 16px;
-  white-space: nowrap;
+  color: var(--color-ink-faint);
 }
 
-.interactions svg {
+.comment-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.comment-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.comment-action:hover {
+  color: var(--color-ink);
+}
+
+.comment-action--liked,
+.comment-action--liked:hover {
+  color: var(--color-brand);
+}
+
+.comment-action__icon {
   flex-shrink: 0;
+  width: 16px;
+  height: 16px;
 }
 
-.show-more {
-    margin-left: 38px;
-    height: 20px;
-    line-height: 20px;
-    color: #13386c;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 14px;
+.comment-action span {
+  min-width: 1.5em;
+  display: inline-block;
+  text-align: left;
+}
+
+.comment-item__children {
+  margin-top: 8px;
+}
+
+.comment-item__more {
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.comment-item__more:hover {
+  color: var(--color-ink);
 }
 
 @keyframes like {
@@ -259,25 +310,15 @@ const handleExpandReplies = (comment) => {
 }
 
 .animate-like {
-  animation: like 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: like 0.4s var(--ease-standard);
   transform-origin: center;
-}
-
-.animate-unlike {
-  animation: unlike 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  transform-origin: center;
-}
-
-/* 防止动画重复播放 */
-.animate-like, .animate-unlike {
   animation-fill-mode: forwards;
 }
 
-/* 防止动画过程中文字抖动 */
-.interactions span {
-  min-width: 1.5em;
-  display: inline-block;
-  text-align: left;
+.animate-unlike {
+  animation: unlike 0.4s var(--ease-standard);
+  transform-origin: center;
+  animation-fill-mode: forwards;
 }
 
 /* 新评论动画效果 */
@@ -287,14 +328,18 @@ const handleExpandReplies = (comment) => {
 
 @keyframes highlightNewComment {
   0% {
-    background-color: rgba(255, 36, 66, 0.1);
+    background-color: var(--color-canvas-sunken);
   }
   100% {
     background-color: transparent;
   }
 }
 
-.reply-nickname {
-  color: rgba(51, 51, 51, 0.6);
+@media (prefers-reduced-motion: reduce) {
+  .animate-like,
+  .animate-unlike,
+  .new-comment-animation {
+    animation: none;
+  }
 }
 </style>

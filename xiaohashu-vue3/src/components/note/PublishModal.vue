@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <!-- 遮罩层 - 调整透明度和模糊效果 -->
-    <div v-if="visible" class="fixed inset-0 bg-gray-800/25 backdrop-blur-sm z-[100]"></div>
+    <div v-if="visible" class="fixed inset-0 bg-ink/30 z-[100]"></div>
     
     <Transition
       enter-active-class="transition duration-200 ease-out"
@@ -13,15 +13,15 @@
     >
       <!-- 发布笔记模态框 -->
       <div v-if="visible" class="fixed inset-0 z-[101] flex items-center justify-center p-4">
-        <div class="bg-white w-[800px] rounded-lg flex flex-col max-h-[90vh] shadow-2xl">
+        <div class="bg-paper w-[800px] rounded-panel flex flex-col max-h-[90vh] shadow-panel">
           <!-- 顶部标题栏 - 优化间距和分割线 -->
-          <div class="p-[24px] flex items-center justify-between px-8 border-b border-gray-100/60 shrink-0">
-            <h2 class="text-[18px] font-bold tracking-tight text-gray-800">发布笔记</h2>
+          <div class="p-[24px] flex items-center justify-between px-8 border-b border-line/60 shrink-0">
+            <h2 class="text-[18px] font-semibold text-ink">发布笔记</h2>
             <button 
-              class="w-8 h-8 flex items-center justify-center hover:bg-gray-100/80 rounded-full transition-colors"
+              class="w-8 h-8 flex items-center justify-center hover:bg-canvas-sunken/80 rounded-full transition-colors"
               @click="onClose"
             >
-              <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg class="w-5 h-5 text-ink-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path d="M18 6L6 18M6 6l12 12" stroke-width="2" stroke-linecap="round"/>
               </svg>
             </button>
@@ -30,14 +30,14 @@
           <!-- 内容区域 - 优化内边距和间距 -->
           <div class="flex-1 overflow-auto px-8 py-6 min-h-[500px]">
             <!-- 笔记类型选择 -->
-            <div class="mb-6 border-b border-gray-100 pb-4">
-              <div class="text-sm font-medium text-gray-700 mb-3">笔记类型</div>
+            <div class="mb-6 border-b border-line pb-4">
+              <div class="text-sm font-medium text-ink-soft mb-3">笔记类型</div>
               <div class="flex gap-4">
                 <button 
                   class="px-4 py-2 rounded-full text-sm font-medium transition-colors border"
                   :class="noteType === 'image' 
-                    ? 'border-[#ff2442] text-[#ff2442] bg-[#fff5f7]' 
-                    : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'"
+                    ? 'border-ink text-ink bg-canvas-sunken' 
+                    : 'border-line text-ink-soft hover:border-ink-faint bg-paper'"
                   @click="setNoteType('image')"
                 >
                   <div class="flex items-center">
@@ -50,7 +50,7 @@
                     <!-- 对号标识 -->
                     <svg 
                       v-if="noteType === 'image'" 
-                      class="w-4 h-4 ml-1.5 text-[#ff2442]" 
+                      class="w-4 h-4 ml-1.5 text-ink" 
                       viewBox="0 0 24 24" 
                       fill="none" 
                       stroke="currentColor"
@@ -62,8 +62,8 @@
                 <button 
                   class="px-4 py-2 rounded-full text-sm font-medium transition-colors border"
                   :class="noteType === 'video' 
-                    ? 'border-[#ff2442] text-[#ff2442] bg-[#fff5f7]' 
-                    : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'"
+                    ? 'border-ink text-ink bg-canvas-sunken' 
+                    : 'border-line text-ink-soft hover:border-ink-faint bg-paper'"
                   @click="setNoteType('video')"
                 >
                   <div class="flex items-center">
@@ -75,7 +75,7 @@
                     <!-- 对号标识 -->
                     <svg 
                       v-if="noteType === 'video'" 
-                      class="w-4 h-4 ml-1.5 text-[#ff2442]" 
+                      class="w-4 h-4 ml-1.5 text-ink" 
                       viewBox="0 0 24 24" 
                       fill="none" 
                       stroke="currentColor"
@@ -93,10 +93,10 @@
               <div 
                 v-for="(file, index) in files" 
                 :key="index"
-                class="relative w-[135px] h-[135px] rounded-xl overflow-hidden bg-gray-100 shrink-0 border border-gray-200"
+                class="relative w-[135px] h-[135px] rounded-card overflow-hidden bg-canvas-sunken shrink-0 border border-line"
                 :class="{
                   'opacity-50': draggedItem === index,
-                  'border-[#ff2442] border-2': dragOverIndex === index && draggedItem !== index,
+                  'border-ink border-2': dragOverIndex === index && draggedItem !== index,
                   'cursor-grab': !isVideo
                 }"
                 :draggable="!isVideo"
@@ -132,8 +132,8 @@
                   ></video>
                   <!-- 播放按钮覆盖层 -->
                   <div class="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors">
-                    <div class="w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center">
-                      <svg class="w-5 h-5 text-[#ff2442]" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                    <div class="w-10 h-10 rounded-full bg-paper/80 backdrop-blur-sm flex items-center justify-center">
+                      <svg class="w-5 h-5 text-ink-soft" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                         <path d="M8 5v14l11-7z"/>
                       </svg>
                     </div>
@@ -178,8 +178,8 @@
               <!-- 上传按钮 -->
               <div 
                 v-if="(noteType === 'image' && files.length < 8) || (noteType === 'video' && files.length === 0)"
-                class="w-[135px] h-[135px] rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center 
-                justify-center cursor-pointer hover:border-[#ff2442] hover:bg-gray-100 transition-colors bg-gray-50/50 shrink-0"
+                class="w-[135px] h-[135px] rounded-card border-2 border-dashed border-line flex flex-col items-center 
+                justify-center cursor-pointer hover:border-ink-faint hover:bg-canvas-sunken transition-colors bg-canvas-sunken/50 shrink-0"
                 @click="triggerUpload"
                 :class="{'opacity-50 pointer-events-none': isUploading}"
               >
@@ -191,12 +191,12 @@
                   :multiple="noteType === 'image'"
                   @change="handleFileChange"
                 />
-                <div class="w-10 h-10 rounded-full bg-white mb-2 flex items-center justify-center border border-gray-200">
-                  <svg class="w-5 h-5 text-[#ff2442]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <div class="w-10 h-10 rounded-full bg-paper mb-2 flex items-center justify-center border border-line">
+                  <svg class="w-5 h-5 text-ink-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/>
                   </svg>
                 </div>
-                <div class="text-[13px] text-gray-500 font-medium">
+                <div class="text-[13px] text-ink-faint font-medium">
                   {{ isUploading ? '上传中...' : (noteType === 'image' ? `${files.length}/8` : '上传视频') }}
                 </div>
               </div>
@@ -205,9 +205,9 @@
             <!-- 拖拽提示 - 只在图文模式下且有多张图片时显示 -->
             <div 
               v-if="!isVideo && files.length > 1"
-              class="text-[13px] text-gray-500 mt-1 flex items-center"
+              class="text-[13px] text-ink-faint mt-1 flex items-center"
             >
-              <svg class="w-4 h-4 mr-1 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg class="w-4 h-4 mr-1 text-ink-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
               拖拽可调整图片顺序
@@ -216,7 +216,7 @@
             <!-- 图片/视频必填提示 -->
             <div 
               v-if="errors.files" 
-              class="text-[#ff2442] text-[13px] mt-1 flex items-center"
+              class="text-brand text-[13px] mt-1 flex items-center"
             >
               <svg class="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <circle cx="12" cy="12" r="10" stroke-width="2"/>
@@ -232,14 +232,14 @@
                   type="text"
                   v-model="title"
                   placeholder="填写标题，可能会帮助更多人看到你的笔记"
-                  class="w-full text-[14px] py-4 focus:outline-none border-b border-gray-100 placeholder:text-gray-400 transition-colors pr-20"
-                  :class="{'border-[#ff2442]': errors.title}"
+                  class="w-full text-[14px] py-4 focus:outline-none border-b border-line placeholder:text-ink-faint transition-colors pr-20"
+                  :class="{'border-brand': errors.title}"
                 />
                 <!-- 清除按钮和字数统计 -->
                 <div class="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
                   <button 
                     v-if="title"
-                    class="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600"
+                    class="w-4 h-4 flex items-center justify-center text-ink-faint hover:text-ink-soft"
                     @click="title = ''"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -247,13 +247,13 @@
                       <path d="M15 9l-6 6M9 9l6 6" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                   </button>
-                  <span class="text-[13px] text-gray-400 font-medium">{{ title.length }}/20</span>
+                  <span class="text-[13px] text-ink-faint font-medium">{{ title.length }}/20</span>
                 </div>
               </div>
               <!-- 标题必填提示 -->
               <div 
                 v-if="errors.title" 
-                class="text-[#ff2442] text-[13px] mt-1 flex items-center"
+                class="text-brand text-[13px] mt-1 flex items-center"
               >
                 <svg class="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <circle cx="12" cy="12" r="10" stroke-width="2"/>
@@ -270,13 +270,13 @@
                   v-model="content"
                   placeholder="添加正文"
                   rows="6"
-                  class="w-full text-[14px] py-4 focus:outline-none resize-none placeholder:text-gray-400 pr-20"
+                  class="w-full text-[14px] py-4 focus:outline-none resize-none placeholder:text-ink-faint pr-20"
                 ></textarea>
                 <!-- 清除按钮和字数统计 -->
                 <div class="absolute right-0 bottom-2 flex items-center gap-2">
                   <button 
                     v-if="content"
-                    class="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600"
+                    class="w-4 h-4 flex items-center justify-center text-ink-faint hover:text-ink-soft"
                     @click="content = ''"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -284,7 +284,7 @@
                       <path d="M15 9l-6 6M9 9l6 6" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                   </button>
-                  <span class="text-[13px] text-gray-400 font-medium">{{ content.length }}/1000</span>
+                  <span class="text-[13px] text-ink-faint font-medium">{{ content.length }}/1000</span>
                 </div>
               </div>
             </div>
@@ -292,14 +292,14 @@
             <!-- 底部选项区域 -->
             <div class="space-y-2 mt-4">
               <!-- 选择频道 -->
-              <div class="relative border-t border-gray-100">
+              <div class="relative border-t border-line">
                 <div 
-                  class="relative py-4 px-4 mt-2 -mx-4 cursor-pointer hover:bg-gray-100 rounded-lg flex items-center justify-between"
+                  class="relative py-4 px-4 mt-2 -mx-4 cursor-pointer hover:bg-canvas-sunken rounded-control flex items-center justify-between"
                   @click="showChannelSelector = !showChannelSelector"
                   ref="channelTriggerRef"
                 >
-                  <div class="flex items-center text-[14px] text-[#333]">
-                    <svg class="w-4 h-4 mr-3 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <div class="flex items-center text-[14px] text-ink">
+                    <svg class="w-4 h-4 mr-3 text-ink-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                       <path d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z" stroke-width="2"/>
                     </svg>
                     <span>
@@ -307,7 +307,7 @@
                     </span>
                   </div>
                   <svg 
-                    class="w-4 h-4 text-gray-400 transition-transform duration-200"
+                    class="w-4 h-4 text-ink-faint transition-transform duration-200"
                     :class="{'rotate-90': showChannelSelector}"
                     viewBox="0 0 24 24" 
                     fill="none" 
@@ -328,22 +328,22 @@
                 >
                   <div 
                     v-if="showChannelSelector"
-                    class="absolute bottom-full left-0 right-0 bg-white rounded-xl shadow-lg p-2 mb-2 z-20 border border-gray-200 channel-selector-dropdown"
+                    class="absolute bottom-full left-0 right-0 bg-paper rounded-card shadow-panel p-2 mb-2 z-20 border border-line channel-selector-dropdown"
                     ref="channelSelectorRef"
                   >
                     <div class="max-h-[300px] overflow-auto">
                       <button
                         v-for="channel in channelStore.channels"
                         :key="channel.id"
-                        class="w-full px-4 py-3 rounded-xl text-left text-[14px] flex items-center justify-between hover:bg-gray-100 transition-colors"
-                        :class="{'text-[#ff2442]': selectedChannel?.id === channel.id}"
+                        class="w-full px-4 py-3 rounded-control text-left text-[14px] flex items-center justify-between hover:bg-canvas-sunken transition-colors"
+                        :class="{'text-ink font-medium': selectedChannel?.id === channel.id}"
                         @click="selectChannel(channel)"
                       >
-                        <div class="flex items-center text-[#333]">
+                        <div class="flex items-center text-ink">
                           <component :is="channel.icon" class="w-4 h-4 mr-2"/>
                           {{ channel.name }}
                         </div>
-                        <div v-if="selectedChannel?.id === channel.id" class="text-[#ff2442]">
+                        <div v-if="selectedChannel?.id === channel.id" class="text-ink">
                           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path d="M20 6L9 17l-5-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                           </svg>
@@ -355,11 +355,11 @@
               </div>
 
               <!-- 添加话题部分 -->
-              <div class="relative border-t border-gray-100">
+              <div class="relative border-t border-line">
                 <!-- 话题标题 -->
                 <div class="py-4 px-4 -mx-4 mt-2">
-                  <div class="flex items-center text-[14px] text-[#333] mb-3">
-                    <svg class="w-4 h-4 mr-3 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <div class="flex items-center text-[14px] text-ink mb-3">
+                    <svg class="w-4 h-4 mr-3 text-ink-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke-width="2"/>
                       <line x1="7" y1="7" x2="7.01" y2="7" stroke-width="2"/>
                     </svg>
@@ -368,16 +368,16 @@
                   
                   <!-- 话题输入和已选话题 -->
                   <div class="relative">
-                    <div class="flex flex-wrap items-center gap-2 min-h-[40px] p-2 border border-gray-200 rounded-lg focus-within:border-[#ff2442]">
+                    <div class="flex flex-wrap items-center gap-2 min-h-[40px] p-2 border border-line rounded-control focus-within:border-brand">
                       <!-- 已选话题标签 -->
                       <div 
                         v-for="(topic, index) in selectedTopics" 
                         :key="index"
-                        class="flex items-center bg-[#f5f5f5] text-[#333] px-2 py-1 rounded-full text-[13px]"
+                        class="flex items-center bg-canvas-sunken text-ink px-2 py-1 rounded-full text-[13px]"
                       >
                         <span class="mr-1">#{{ topic.name }}</span>
                         <button 
-                          class="w-4 h-4 flex items-center justify-center text-gray-500 hover:text-gray-700"
+                          class="w-4 h-4 flex items-center justify-center text-ink-faint hover:text-ink-soft"
                           @click.stop="removeTopic(topic)"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="w-3 h-3">
@@ -402,17 +402,17 @@
                       />
                     </div>
 
-                    <div v-if="errors.topic" class="mt-1 text-[13px] text-[#ff2442]">
+                    <div v-if="errors.topic" class="mt-1 text-[13px] text-brand">
                       选择频道时请同时添加一个话题
                     </div>
 
                     <!-- 话题建议列表 -->
                     <div 
                       v-if="isTopicInputActive && (topicSuggestions.length > 0 || isLoadingTopics || topicKeyword.trim())"
-                      class="absolute bottom-full left-0 right-0 bg-white rounded-xl shadow-lg p-2 mb-2 z-20 border border-gray-200 max-h-[300px] overflow-auto"
+                      class="absolute bottom-full left-0 right-0 bg-paper rounded-card shadow-panel p-2 mb-2 z-20 border border-line max-h-[300px] overflow-auto"
                     >
                       <!-- 加载中状态 -->
-                      <div v-if="isLoadingTopics" class="py-3 px-4 text-gray-500 text-center">
+                      <div v-if="isLoadingTopics" class="py-3 px-4 text-ink-faint text-center">
                         <div class="flex items-center justify-center">
                           <svg class="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -426,28 +426,28 @@
                       <button
                         v-for="topic in topicSuggestions"
                         :key="topic.id"
-                        class="w-full px-4 py-3 rounded-xl text-left text-[14px] flex items-center hover:bg-gray-100 transition-colors"
+                        class="w-full px-4 py-3 rounded-control text-left text-[14px] flex items-center hover:bg-canvas-sunken transition-colors"
                         @click="selectTopic(topic)"
                       >
-                        <svg class="w-4 h-4 mr-2 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <svg class="w-4 h-4 mr-2 text-ink-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                           <path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                        <span class="text-[#333]">{{ topic.name }}</span>
+                        <span class="text-ink">{{ topic.name }}</span>
                       </button>
                       
                       <!-- 添加新话题选项 -->
                       <button
                         v-if="topicKeyword.trim() && !isLoadingTopics && !isTopicExistsInSuggestions"
-                        class="w-full px-4 py-3 rounded-xl text-left text-[14px] flex items-center justify-between hover:bg-gray-100 transition-colors"
+                        class="w-full px-4 py-3 rounded-control text-left text-[14px] flex items-center justify-between hover:bg-canvas-sunken transition-colors"
                         @click="createNewTopic"
                       >
                         <div class="flex items-center">
-                          <svg class="w-4 h-4 mr-2 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <svg class="w-4 h-4 mr-2 text-ink-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                           </svg>
-                          <span class="text-[#333]">{{ topicKeyword.trim() }}</span>
+                          <span class="text-ink">{{ topicKeyword.trim() }}</span>
                         </div>
-                        <span class="text-[#ff2442] text-xs font-medium">添加新话题</span>
+                        <span class="text-ink text-xs font-medium">添加新话题</span>
                       </button>
                     </div>
                   </div>
@@ -457,20 +457,18 @@
           </div>
 
           <!-- 底部按钮区域 -->
-          <div class="border-t border-gray-100 shrink-0">
-            <div class="px-8 py-6 rounded-b-[20px] flex gap-4">
+          <div class="border-t border-line shrink-0">
+            <div class="px-8 py-6 flex gap-4">
               <!-- 取消按钮 -->
               <button 
-                class="w-32 border border-gray-200 text-gray-600 hover:text-gray-800 
-                hover:bg-gray-100
-                py-3 rounded-full font-bold text-[18px] cursor-pointer transition-all"
+                class="st-btn st-btn-ghost w-32 h-12 text-[16px]"
                 @click="onClose"
               >
                 取消
               </button>
               <!-- 发布按钮 -->
               <button 
-                class="flex-1 bg-[#ff2442] text-white py-3 rounded-full font-bold text-[18px] hover:opacity-90 cursor-pointer transition-all"
+                class="st-btn st-btn-primary flex-1 h-12 text-[16px]"
                 @click="handlePublish"
               >
                 发布笔记
@@ -1178,12 +1176,12 @@ const onDrop = (index) => {
 /* 输入框 placeholder 样式 */
 input::placeholder,
 textarea::placeholder {
-  color: #999;
+  color: var(--color-ink-faint);
 }
 
 input:focus::placeholder,
 textarea:focus::placeholder {
-  color: #ccc;
+  color: var(--color-line-strong);
 }
 
 /* 拖拽相关样式 */

@@ -1,106 +1,84 @@
 <template>
-  <div v-if="visible" class="fixed inset-0 flex items-center justify-center" style="z-index: 9999;">
+  <div v-if="visible" class="login-layer">
     <!-- 遮罩层 -->
-    <div class="absolute inset-0 bg-gray-800/25" style="z-index: 9998;" @click="onClose"></div>
-    
+    <div class="login-mask" @click="onClose"></div>
+
     <!-- 登录框 -->
-    <Transition 
-      name="zoom"
-      appear
-      @before-enter="onBeforeEnter"
-      @enter="onEnter"
-      @leave="onLeave"
-    >
-      <div class="relative bg-white rounded-lg w-[480px]" style="z-index: 9999;" ref="modalRef">
-        <!-- 关闭按钮 -->
-        <button 
-          class="absolute right-6 top-6 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2" 
-          @click="onClose"
-        >
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round"/>
+    <Transition name="zoom" appear @before-enter="onBeforeEnter" @enter="onEnter" @leave="onLeave">
+      <div class="login-panel" ref="modalRef" role="dialog" aria-modal="true" aria-label="登录书亭">
+        <button type="button" class="login-close" aria-label="关闭" @click="onClose">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
           </svg>
         </button>
 
-        <!-- 登录内容 -->
-        <div class="text-center px-[72px] py-10">
-          <h2 class="text-[18px] font-bold mb-12">手机号登录</h2>
-          
+        <div class="login-body">
+          <BrandLogo class="login-seal" :size="44" :show-word="false" />
+          <h2 class="login-title">手机号登录</h2>
+          <p class="login-note">新用户可直接登录</p>
+
           <!-- 手机号输入 -->
-          <div class="relative mb-4">
-            <div class="flex items-center bg-[#f4f4f4] rounded-3xl h-[48px] px-4">
-              <div class="flex items-center text-[15px] text-gray-800">
-                <span>+86</span>
-                <div class="mx-2 w-[1px] h-[14px] bg-[#ddd]"></div>
-              </div>
-              <input 
-                type="text" 
-                placeholder="输入手机号" 
-                class="flex-1 outline-none text-[15px] ml-1 bg-transparent caret-[#ff2442]"
-                v-model="formattedPhone"
-                maxlength="13"
-                @input="formatPhoneNumber"
-              >
+          <div class="login-field">
+            <div class="login-prefix">
+              <span class="st-num">+86</span>
+              <span class="login-prefix__divider"></span>
             </div>
+            <input
+              type="text"
+              inputmode="numeric"
+              placeholder="输入手机号"
+              class="login-input"
+              v-model="formattedPhone"
+              maxlength="13"
+              @input="formatPhoneNumber"
+            />
           </div>
 
           <!-- 验证码输入 -->
-          <div class="relative mb-8">
-            <div class="flex items-center bg-[#f4f4f4] rounded-3xl h-[48px] px-4">
-              <input 
-                type="text" 
-                placeholder="输入验证码" 
-                class="flex-1 outline-none text-[15px] bg-transparent caret-[#ff2442]"
-                v-model="code"
-                maxlength="6"
-                @input="formatCode"
-              >
-              <button 
-                class="text-[15px] font-medium ml-4 cursor-pointer transition-colors"
-                :class="buttonClass"
-                @click="getCode"
-                :disabled="!isPhoneValid || countdown > 0"
-              >
-                {{ countdown > 0 ? `重新发送(${countdown}s)` : '获取验证码' }}
-              </button>
-            </div>
+          <div class="login-field">
+            <input
+              type="text"
+              inputmode="numeric"
+              placeholder="输入验证码"
+              class="login-input login-input--code"
+              v-model="code"
+              maxlength="6"
+              @input="formatCode"
+            />
+            <button
+              type="button"
+              class="login-code-btn"
+              :class="buttonClass"
+              @click="getCode"
+              :disabled="!isPhoneValid || countdown > 0"
+            >
+              {{ countdown > 0 ? `重新发送(${countdown}s)` : '获取验证码' }}
+            </button>
           </div>
 
           <!-- 登录按钮 -->
-          <button 
-            class="w-full bg-[#ff2442] text-white rounded-full h-[48px] text-[16px] cursor-pointer
-            font-bold hover:bg-opacity-90 mt-5"
-            @click="handleLogin"
-          >
+          <button type="button" class="st-btn st-btn-primary login-submit" @click="handleLogin">
             登录
           </button>
 
           <!-- 协议勾选 -->
-          <div class="mt-5 text-xs text-gray-700">
-            <div class="flex justify-center gap-1">
-              <input type="checkbox" class="w-4 h-4" v-model="agreeTerms">
-              <div>
-                <span>我已阅读并同意</span>
-                <a href="#" class="text-[#13386c] cursor-pointer">《用户协议》</a>
-                <a href="#" class="text-[#13386c] cursor-pointer">《隐私政策》</a>
-                <a href="#" class="text-[#13386c] cursor-pointer">《儿童/青少年个人信息保护规则》</a>
-              </div>
-            </div>
-          </div>
-
-          <!-- 新用户提示 -->
-          <div class="mt-8 text-[14px] text-gray-500">
-            新用户可直接登录
+          <div class="login-terms">
+            <label class="login-terms__row">
+              <input type="checkbox" class="login-checkbox" v-model="agreeTerms" />
+              <span class="login-terms__text">
+                我已阅读并同意
+                <a href="#" class="login-link">《用户协议》</a>
+                <a href="#" class="login-link">《隐私政策》</a>
+                <a href="#" class="login-link">《儿童/青少年个人信息保护规则》</a>
+              </span>
+            </label>
           </div>
         </div>
       </div>
     </Transition>
 
     <!-- 添加协议确认模态框 -->
-    <TermsConfirmModal
-      v-model:visible="showTermsConfirm"
-      @confirm="handleConfirmTerms"
-    />
+    <TermsConfirmModal v-model:visible="showTermsConfirm" @confirm="handleConfirmTerms" />
   </div>
 </template>
 
@@ -108,6 +86,7 @@
 import { ref, computed, onUnmounted } from 'vue'
 import gsap from 'gsap'
 import { message } from '@/utils/message'
+import BrandLogo from '@/components/common/BrandLogo.vue'
 import TermsConfirmModal from './TermsConfirmModal.vue'
 import { login, getVerificationCode } from '@/api/auth'
 import { getUserProfile } from '@/api/user'
@@ -149,11 +128,11 @@ const isPhoneValid = computed(() => {
 // 按钮样式计算属性
 const buttonClass = computed(() => {
   if (countdown.value > 0) {
-    return 'text-[#fe2c55]/40 cursor-not-allowed'
+    return 'text-ink-faint cursor-not-allowed'
   }
   return isPhoneValid.value 
-    ? 'text-[#fe2c55] hover:text-[#f4294f]' 
-    : 'text-[#fe2c55]/60 cursor-not-allowed'
+    ? 'text-ink hover:opacity-70' 
+    : 'text-ink-faint cursor-not-allowed'
 })
 
 // 获取验证码
@@ -303,6 +282,201 @@ const formatCode = (event) => {
 </script>
 
 <style scoped>
+.login-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgb(20 17 14 / 0.32);
+}
+
+.login-panel {
+  position: relative;
+  z-index: 2;
+  width: 440px;
+  max-width: 100%;
+  background: var(--color-paper);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.login-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.login-close:hover {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+}
+
+.login-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.login-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 40px 32px;
+  text-align: center;
+}
+
+.login-seal {
+  margin-bottom: 16px;
+}
+
+.login-title {
+  font-size: 24px;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+
+.login-note {
+  margin: 6px 0 28px;
+  font-size: 13px;
+  color: var(--color-ink-faint);
+}
+
+.login-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+}
+
+.login-field:focus-within {
+  border-color: var(--color-line-strong);
+  background: var(--color-paper);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.08);
+}
+
+.login-prefix {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--color-ink);
+}
+
+.login-prefix__divider {
+  width: 1px;
+  height: 14px;
+  background: var(--color-line);
+}
+
+.login-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+  color: var(--color-ink);
+  letter-spacing: 0.01em;
+}
+
+.login-input::placeholder {
+  color: var(--color-ink-faint);
+}
+
+.login-input--code {
+  letter-spacing: 0.18em;
+}
+
+.login-code-btn {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.login-submit {
+  width: 100%;
+  height: 48px;
+  margin-top: 12px;
+  font-size: 16px;
+}
+
+.login-terms {
+  margin-top: 20px;
+}
+
+.login-terms__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.login-checkbox {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  accent-color: var(--color-ink);
+  cursor: pointer;
+}
+
+.login-terms__text {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--color-ink-faint);
+}
+
+.login-link {
+  color: var(--color-ink-soft);
+  text-decoration: underline;
+  text-decoration-color: var(--color-line);
+  text-underline-offset: 2px;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.login-link:hover {
+  color: var(--color-ink);
+  text-decoration-color: currentColor;
+}
+
 .zoom-move {
   transition: transform 0.3s ease-out;
 }
@@ -311,6 +485,7 @@ const formatCode = (event) => {
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-box-shadow: 0 0 0 30px var(--color-paper) inset !important;
+  -webkit-text-fill-color: var(--color-ink);
 }
 </style>
