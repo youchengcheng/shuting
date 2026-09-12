@@ -190,6 +190,7 @@ const handlePublish = () => {
   padding: 12px 18px 24px;
   background: var(--color-canvas);
   overflow-y: auto;
+  overflow-x: hidden;
   z-index: 30;
 }
 
