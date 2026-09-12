@@ -37,6 +37,7 @@ import com.quanxiaoha.xiaohashu.note.biz.model.vo.*;
 import com.quanxiaoha.xiaohashu.note.biz.rpc.CountRpcService;
 import com.quanxiaoha.xiaohashu.note.biz.rpc.DistributedIdGeneratorRpcService;
 import com.quanxiaoha.xiaohashu.note.biz.rpc.KeyValueRpcService;
+import com.quanxiaoha.xiaohashu.note.biz.rpc.RelationRpcService;
 import com.quanxiaoha.xiaohashu.note.biz.rpc.UserRpcService;
 import com.quanxiaoha.xiaohashu.note.biz.service.NoteService;
 import com.quanxiaoha.xiaohashu.user.dto.resp.FindUserByIdRspDTO;
@@ -86,6 +87,8 @@ public class NoteServiceImpl implements NoteService {
     private DistributedIdGeneratorRpcService distributedIdGeneratorRpcService;
     @Resource
     private UserRpcService userRpcService;
+    @Resource
+    private RelationRpcService relationRpcService;
     @Resource(name = "taskExecutor")
     private ThreadPoolTaskExecutor threadPoolTaskExecutor;
     @Resource
@@ -154,7 +157,6 @@ public class NoteServiceImpl implements NoteService {
                 Preconditions.checkArgument(StringUtils.isNotBlank(videoUri),"笔记视频不能为空");
 
                 break;
-
             default:
                 //switch 3.默认直接break结束
                 break;
@@ -314,7 +316,6 @@ public class NoteServiceImpl implements NoteService {
             }
         });
 
-
         //返回
         return Response.success();
     }
@@ -342,6 +343,8 @@ public class NoteServiceImpl implements NoteService {
             checkNoteVisibleFromVO(userId,findNoteDetailRspVO);
             // 填充点赞/收藏/评论计数
             fillNoteCount(findNoteDetailRspVO);
+            // 填充当前登录用户是否已关注作者（用户态数据，不写入缓存）
+            fillFollowStatus(userId, findNoteDetailRspVO);
             return Response.success(findNoteDetailRspVO);
         }
         //再到redis中查询笔记是否存在
@@ -353,11 +356,14 @@ public class NoteServiceImpl implements NoteService {
             //存在校验可见性,后直接返回
             FindNoteDetailRspVO findNoteDetailRspVO = JsonUtils.parseObject(noteDetailJson, FindNoteDetailRspVO.class);
 
+            // 提前序列化：避免异步任务把"是否关注"这类用户态数据写入本地缓存
+            String localCacheValue = Objects.isNull(findNoteDetailRspVO) ? "null" : JsonUtils.toJsonString(findNoteDetailRspVO);
+
             //异步缓存到本地
             threadPoolTaskExecutor.submit(()->{
-                log.info("==> 异步缓存到本地；{}", findNoteDetailRspVOStrLocalCache);
+                log.info("==> 异步缓存到本地；{}", localCacheValue);
                 //先判断从redis中查询到的数据进行判断
-                LOCAL_CACHE.put(noteId,Objects.isNull(findNoteDetailRspVO) ? "null" : JsonUtils.toJsonString(findNoteDetailRspVO));
+                LOCAL_CACHE.put(noteId, localCacheValue);
             });
 
             //可见性校验
@@ -368,6 +374,8 @@ public class NoteServiceImpl implements NoteService {
             }
             // 填充点赞/收藏/评论计数
             fillNoteCount(findNoteDetailRspVO);
+            // 填充当前登录用户是否已关注作者（用户态数据，不写入缓存）
+            fillFollowStatus(userId, findNoteDetailRspVO);
             return Response.success(findNoteDetailRspVO);
         }
 
@@ -457,13 +465,18 @@ public class NoteServiceImpl implements NoteService {
         // 填充点赞/收藏/评论计数
         fillNoteCount(findNoteDetailRspVO);
 
+        // 先序列化要写入缓存的 JSON，再异步写缓存（必须早于"是否关注"的填充，避免把用户态数据写入共享缓存）
+        String noteDetailCacheJson = JsonUtils.toJsonString(findNoteDetailRspVO);
+
         //异步线程将笔记详情存入redis中
         threadPoolTaskExecutor.submit(()->{
-            String noteDetailJson1 = JsonUtils.toJsonString(findNoteDetailRspVO);
             //设置过期时间
             long expireSeconds = 60*60*24 + RandomUtil.randomInt(60*60*24);
-            redisTemplate.opsForValue().set(noteDetailRedisKey,noteDetailJson1,expireSeconds,TimeUnit.SECONDS);
+            redisTemplate.opsForValue().set(noteDetailRedisKey,noteDetailCacheJson,expireSeconds,TimeUnit.SECONDS);
         });
+
+        // 填充当前登录用户是否已关注作者（用户态数据，不写入缓存）
+        fillFollowStatus(userId, findNoteDetailRspVO);
 
         return Response.success(findNoteDetailRspVO);
     }
@@ -1788,6 +1801,31 @@ public class NoteServiceImpl implements NoteService {
     /*
     * 填充笔记互动数据（点赞/收藏/评论总数）
     * */
+    /*
+    * 填充当前登录用户是否已关注笔记作者
+    * 说明：该字段因访问者而异，不能写入 Redis / 本地缓存
+    * */
+    private void fillFollowStatus(Long currUserId, FindNoteDetailRspVO findNoteDetailRspVO) {
+        if (Objects.isNull(findNoteDetailRspVO)) {
+            return;
+        }
+
+        Long creatorId = findNoteDetailRspVO.getCreatorId();
+        // 未登录、作者为空、查看自己的笔记，一律按未关注处理
+        if (Objects.isNull(currUserId) || Objects.isNull(creatorId) || Objects.equals(currUserId, creatorId)) {
+            findNoteDetailRspVO.setIsFollowing(Boolean.FALSE);
+            return;
+        }
+
+        try {
+            findNoteDetailRspVO.setIsFollowing(relationRpcService.isFollowed(creatorId));
+        } catch (Exception e) {
+            // 关注状态属于附加信息，查询失败降级为未关注，不能影响笔记详情返回
+            log.error("==> 查询当前用户是否已关注作者失败, currUserId: {}, creatorId: {}", currUserId, creatorId, e);
+            findNoteDetailRspVO.setIsFollowing(Boolean.FALSE);
+        }
+    }
+
     private void fillNoteCount(FindNoteDetailRspVO findNoteDetailRspVO) {
         if (Objects.isNull(findNoteDetailRspVO) || Objects.isNull(findNoteDetailRspVO.getId())) {
             return;

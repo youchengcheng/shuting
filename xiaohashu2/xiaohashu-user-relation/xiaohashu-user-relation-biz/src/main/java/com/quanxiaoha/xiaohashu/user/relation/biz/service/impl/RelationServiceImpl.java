@@ -16,6 +16,7 @@ import com.quanxiaoha.xiaohashu.user.relation.biz.domain.dataobject.FansDO;
 import com.quanxiaoha.xiaohashu.user.relation.biz.domain.dataobject.FollowingDO;
 import com.quanxiaoha.xiaohashu.user.relation.biz.domain.mapper.FansDOMapper;
 import com.quanxiaoha.xiaohashu.user.relation.biz.domain.mapper.FollowingDOMapper;
+import com.quanxiaoha.xiaohashu.user.relation.biz.enums.FollowCheckResultEnum;
 import com.quanxiaoha.xiaohashu.user.relation.biz.enums.LuaResultEnum;
 import com.quanxiaoha.xiaohashu.user.relation.biz.enums.ResponseCodeEnum;
 import com.quanxiaoha.xiaohashu.user.relation.biz.model.dto.FollowUserMqDTO;
@@ -23,6 +24,7 @@ import com.quanxiaoha.xiaohashu.user.relation.biz.model.dto.UnfollowUserMqDTO;
 import com.quanxiaoha.xiaohashu.user.relation.biz.model.vo.*;
 import com.quanxiaoha.xiaohashu.user.relation.biz.rpc.UserRpcService;
 import com.quanxiaoha.xiaohashu.user.relation.biz.service.RelationService;
+import com.quanxiaoha.xiaohashu.user.relation.dto.req.IsFollowedReqDTO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.producer.SendCallback;
@@ -161,6 +163,54 @@ public class RelationServiceImpl implements RelationService {
         });
 
         return Response.success();
+    }
+
+    /*
+     * 校验当前登录用户是否已关注目标用户
+     * */
+    @Override
+    public Response<Boolean> isFollowed(IsFollowedReqDTO isFollowedReqDTO) {
+        Long followUserId = isFollowedReqDTO.getFollowUserId();
+        // 当前登录用户（由网关注入的 userId 请求头解析而来）
+        Long currUserId = LoginUserContextHolder.getUserId();
+
+        // 未登录、或查询的是自己，直接返回未关注
+        if (Objects.isNull(currUserId) || Objects.equals(currUserId, followUserId)) {
+            return Response.success(Boolean.FALSE);
+        }
+
+        // 1.先查 Redis 中的关注列表缓存
+        String followingRedisKey = RedisKeyConstants.buildUserFollowingKey(currUserId);
+
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(new ClassPathResource("lua/follow_check_only.lua")));
+        script.setResultType(Long.class);
+
+        Long result = redisTemplate.execute(script, Collections.singletonList(followingRedisKey), followUserId);
+        FollowCheckResultEnum followCheckResultEnum = FollowCheckResultEnum.valueOf(result);
+
+        // 缓存命中：直接以缓存结果为准
+        if (Objects.equals(FollowCheckResultEnum.FOLLOWED, followCheckResultEnum)) {
+            return Response.success(Boolean.TRUE);
+        }
+        if (Objects.equals(FollowCheckResultEnum.NOT_FOLLOWED, followCheckResultEnum)) {
+            return Response.success(Boolean.FALSE);
+        }
+
+        // 返回值不在枚举范围内，属于异常情况，抛出业务异常
+        if (Objects.isNull(followCheckResultEnum)) {
+            log.error("==> 校验是否关注：Lua 脚本返回了未知结果, result: {}, currUserId: {}, followUserId: {}",
+                    result, currUserId, followUserId);
+            throw new BizException(ResponseCodeEnum.FOLLOW_STATUS_CHECK_FAIL);
+        }
+
+        // 2.缓存不存在（CACHE_NOT_EXIST），回源数据库
+        boolean isFollowed = followingDOMapper.selectCountByUserIdAndFollowingUserId(currUserId, followUserId) > 0;
+
+        // 3.异步重建关注列表缓存，避免后续请求继续打到数据库
+        threadPoolTaskExecutor.submit(() -> syncFollowingList2Redis(currUserId));
+
+        return Response.success(isFollowed);
     }
 
     /*

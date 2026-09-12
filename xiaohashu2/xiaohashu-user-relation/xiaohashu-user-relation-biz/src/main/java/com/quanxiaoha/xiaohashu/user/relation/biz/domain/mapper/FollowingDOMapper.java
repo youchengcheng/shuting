@@ -35,6 +35,12 @@ public interface FollowingDOMapper {
     int selectCountByUserId(Long userId);
 
     /*
+    * 校验是否已关注
+    * */
+    int selectCountByUserIdAndFollowingUserId(@Param("userId") Long userId,
+                                              @Param("followingUserId") Long followingUserId);
+
+    /*
     * 分页查询
     * */
     List<FollowingDO> selectPageListByUserId(@Param("userId") Long userId,@Param("offset") long offset,@Param("limit") long limit);

@@ -9,11 +9,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * @author: 犬小哈
- * @date: 2024/4/7 15:17
- * @version: v1.0.0
- * @description: 用户登录（支持密码或验证码两种方式）
- **/
+ * 用户登录（支持密码或验证码两种方式）
+ */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

@@ -8,11 +8,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * @author: 犬小哈
- * @date: 2024/4/4 13:22
- * @version: v1.0.0
- * @description: Feign 测试接口
- **/
+ * Feign 测试接口
+ */
 @RestController
 @RequestMapping("/file")
 @Slf4j

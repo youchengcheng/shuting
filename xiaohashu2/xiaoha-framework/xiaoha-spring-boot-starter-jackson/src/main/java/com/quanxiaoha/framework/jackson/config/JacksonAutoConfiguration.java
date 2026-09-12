@@ -29,11 +29,8 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 
 /**
- * @author: 犬小哈
- * @date: 2024/4/15 13:50
- * @version: v1.0.0
- * @description: 自动配置自定义的 Jackson
- **/
+ * 自动配置自定义的 Jackson
+ */
 @AutoConfiguration
 public class JacksonAutoConfiguration {
 

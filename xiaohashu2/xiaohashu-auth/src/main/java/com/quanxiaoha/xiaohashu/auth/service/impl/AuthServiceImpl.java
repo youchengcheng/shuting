@@ -28,11 +28,8 @@ import java.util.Objects;
 
 
 /**
- * @author: 犬小哈
- * @date: 2024/4/7 15:41
- * @version: v1.0.0
- * @description: TODO
- **/
+ * TODO
+ */
 @Service
 @Slf4j
 public class AuthServiceImpl implements AuthService {

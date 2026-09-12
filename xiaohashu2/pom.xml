@@ -307,6 +307,12 @@
 
             <dependency>
                 <groupId>com.quanxiaoha</groupId>
+                <artifactId>xiaohashu-user-relation-api</artifactId>
+                <version>${revision}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.quanxiaoha</groupId>
                 <artifactId>xiaohashu-kv-api</artifactId>
                 <version>${revision}</version>
             </dependency>

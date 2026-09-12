@@ -97,6 +97,14 @@
     select count(1) from t_following where user_id = #{userId}
   </select>
 
+  <!-- 校验是否已关注 -->
+  <select id="selectCountByUserIdAndFollowingUserId" resultType="java.lang.Integer">
+    select count(1)
+    from t_following
+    where user_id = #{userId}
+      and following_user_id = #{followingUserId}
+  </select>
+
   <!-- 分页查询 -->
   <select id="selectPageListByUserId" resultMap="BaseResultMap" parameterType="map">
     select following_user_id

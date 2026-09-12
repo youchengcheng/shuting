@@ -9,11 +9,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * @author: 犬小哈
- * @date: 2024/4/7 15:17
- * @version: v1.0.0
- * @description: 查询笔记详情 响应VO
- **/
+ * 查询笔记详情 响应VO
+ */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -64,6 +61,11 @@ public class FindNoteDetailRspVO {
      * 发布者昵称
      */
     private String creatorName;
+
+    /**
+     * 当前登录用户是否已关注作者（用户态数据，不写入缓存）
+     */
+    private Boolean isFollowing;
 
     /**
      * 发布者头像

@@ -11,11 +11,8 @@ import org.springframework.data.cassandra.core.mapping.PrimaryKeyColumn;
 import java.util.UUID;
 
 /**
- * @author: 犬小哈
- * @date: 2024/7/14 16:19
- * @version: v1.0.0
- * @description: 评论内容主键
- **/
+ * 评论内容主键
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

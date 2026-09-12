@@ -33,11 +33,8 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * @author: 犬小哈
- * @date: 2024/8/9 11:52
- * @version: v1.0.0
- * @description: 计数: 笔记收藏数
- **/
+ * 计数: 笔记收藏数
+ */
 @Component
 @RocketMQMessageListener(consumerGroup = "xiaohashu_group_" + MQConstants.TOPIC_COUNT_NOTE_COLLECT, // Group 组
         topic = MQConstants.TOPIC_COUNT_NOTE_COLLECT // 主题 Topic

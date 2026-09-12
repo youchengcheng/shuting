@@ -8,11 +8,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * @author: 犬小哈
- * @date: 2024/4/7 15:17
- * @version: v1.0.0
- * @description: 点赞、取消点赞笔记
- **/
+ * 点赞、取消点赞笔记
+ */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

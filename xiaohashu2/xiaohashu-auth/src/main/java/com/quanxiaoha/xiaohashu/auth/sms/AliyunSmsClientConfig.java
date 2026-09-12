@@ -9,11 +9,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * @author: 犬小哈
- * @date: 2024/5/24 15:06
- * @version: v1.0.0
- * @description: 短信发送客户端
- **/
+ * 短信发送客户端
+ */
 @Configuration
 @Slf4j
 public class AliyunSmsClientConfig {

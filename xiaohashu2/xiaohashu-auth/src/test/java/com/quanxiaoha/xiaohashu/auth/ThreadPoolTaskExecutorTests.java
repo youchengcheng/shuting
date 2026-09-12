@@ -7,11 +7,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * @author: 犬小哈
- * @date: 2024/5/23 15:56
- * @version: v1.0.0
- * @description: TODO
- **/
+ * TODO
+ */
 @SpringBootTest
 @Slf4j
 public class ThreadPoolTaskExecutorTests {

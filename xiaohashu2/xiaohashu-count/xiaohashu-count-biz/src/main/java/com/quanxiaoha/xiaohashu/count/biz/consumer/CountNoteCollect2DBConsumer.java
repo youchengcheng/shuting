@@ -22,11 +22,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @author: 犬小哈
- * @date: 2024/8/9 11:52
- * @version: v1.0.0
- * @description: 计数: 笔记收藏数落库
- **/
+ * 计数: 笔记收藏数落库
+ */
 @Component
 @RocketMQMessageListener(consumerGroup = "xiaohashu_group_" + MQConstants.TOPIC_COUNT_NOTE_COLLECT_2_DB, // Group 组
         topic = MQConstants.TOPIC_COUNT_NOTE_COLLECT_2_DB // 主题 Topic

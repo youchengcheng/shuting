@@ -6,11 +6,8 @@ import lombok.Getter;
 import java.util.Objects;
 
 /**
- * @author: 犬小哈
- * @url: www.quanxiaoha.com
- * @date: 2023-08-15 10:33
- * @description: 笔记收藏：执行 Lua 脚本返回结果
- **/
+ * 笔记收藏：执行 Lua 脚本返回结果
+ */
 @Getter
 @AllArgsConstructor
 public enum NoteCollectLuaResultEnum {

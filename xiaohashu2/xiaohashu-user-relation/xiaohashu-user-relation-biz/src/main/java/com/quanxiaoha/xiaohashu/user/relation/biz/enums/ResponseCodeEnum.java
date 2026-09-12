@@ -5,11 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * @author: 犬小哈
- * @url: www.quanxiaoha.com
- * @date: 2023-08-15 10:33
- * @description: 响应异常码
- **/
+ * 响应异常码
+ */
 @Getter
 @AllArgsConstructor
 public enum ResponseCodeEnum implements BaseExceptionInterface {
@@ -25,6 +22,7 @@ public enum ResponseCodeEnum implements BaseExceptionInterface {
     ALREADY_FOLLOWED("RELATION-20004", "您已经关注了该用户"),
     CANT_UNFOLLOW_YOUR_SELF("RELATION-20005", "无法取关自己"),
     NOT_FOLLOWED("RELATION-20006", "你未关注对方，无法取关"),
+    FOLLOW_STATUS_CHECK_FAIL("RELATION-20007", "查询关注状态失败"),
     ;
 
     // 异常码

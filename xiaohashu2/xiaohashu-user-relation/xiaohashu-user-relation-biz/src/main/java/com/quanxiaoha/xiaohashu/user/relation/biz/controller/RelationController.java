@@ -5,6 +5,7 @@ import com.quanxiaoha.framework.common.response.PageResponse;
 import com.quanxiaoha.framework.common.response.Response;
 import com.quanxiaoha.xiaohashu.user.relation.biz.model.vo.*;
 import com.quanxiaoha.xiaohashu.user.relation.biz.service.RelationService;
+import com.quanxiaoha.xiaohashu.user.relation.dto.req.IsFollowedReqDTO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
@@ -55,5 +56,14 @@ public class RelationController {
     @ApiOperationLog(description = "查询用户粉丝列表")
     public PageResponse<FindFansUserRspVO> findFansList(@Validated @RequestBody FindFansListReqVO findFansListReqVO){
         return relationService.findFansList(findFansListReqVO);
+    }
+
+    /*
+    * 校验当前登录用户是否已关注目标用户
+    * */
+    @PostMapping("/isFollowed")
+    @ApiOperationLog(description = "校验是否已关注")
+    public Response<Boolean> isFollowed(@Validated @RequestBody IsFollowedReqDTO isFollowedReqDTO){
+        return relationService.isFollowed(isFollowedReqDTO);
     }
 }

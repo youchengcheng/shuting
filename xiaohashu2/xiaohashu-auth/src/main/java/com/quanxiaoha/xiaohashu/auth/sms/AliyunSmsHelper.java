@@ -10,11 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * @author: 犬小哈
- * @date: 2024/5/24 15:05
- * @version: v1.0.0
- * @description: 短信发送工具类
- **/
+ * 短信发送工具类
+ */
 @Component
 @Slf4j
 public class AliyunSmsHelper {
