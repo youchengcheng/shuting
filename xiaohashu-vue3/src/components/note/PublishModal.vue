@@ -123,15 +123,28 @@
                 @drop="onDrop(index)"
               >
                 <!-- 上传中状态 -->
-                <div 
+                <div
                   v-if="isUploading && index >= files.length - (noteType === 'video' ? 1 : files.length)"
                   class="absolute inset-0 bg-black/30 backdrop-blur-sm flex flex-col items-center justify-center text-white"
                 >
-                  <svg class="animate-spin h-8 w-8 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"></path>
-                  </svg>
-                  <div class="text-sm">上传中 {{ uploadProgress }}%</div>
+                  <!-- 图片：spinner + 百分比 -->
+                  <template v-if="!isVideo">
+                    <svg class="animate-spin h-8 w-8 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"></path>
+                    </svg>
+                    <div class="text-sm">上传中 {{ uploadProgress }}%</div>
+                  </template>
+                  <!-- 视频：进度条 + 百分比 -->
+                  <template v-else>
+                    <div class="w-3/4 h-1.5 bg-white/30 rounded overflow-hidden">
+                      <div
+                        class="h-full bg-white transition-all duration-200"
+                        :style="{ width: uploadProgress + '%' }"
+                      ></div>
+                    </div>
+                    <div class="text-xs mt-1.5">{{ uploadProgress }}%</div>
+                  </template>
                 </div>
                 
                 <!-- 视频缩略图 -->
@@ -681,19 +694,38 @@ const handleFileChange = async (e) => {
     // 逐个上传文件
     for (let i = 0; i < filesToAdd.length; i++) {
       const file = filesToAdd[i]
-      
-      // 更新上传进度
-      uploadProgress.value = Math.round((i / filesToAdd.length) * 100)
-      
+
+      // 图片按文件序号计算进度；视频单独走 onUploadProgress 真实进度
+      if (noteType.value !== 'video') {
+        uploadProgress.value = Math.round((i / filesToAdd.length) * 100)
+      }
+
       // 上传文件
       const formData = new FormData()
       formData.append('file', file)
-      
-      const res = await uploadFile(formData)
-      
+
+      // 视频模式：禁用 axios 全局 15s 超时，并通过 onUploadProgress 上报真实进度
+      const uploadConfig = noteType.value === 'video'
+        ? {
+            timeout: 0,
+            onUploadProgress: (e) => {
+              if (e.lengthComputable) {
+                // 卡 99%，待响应返回后再置 100，避免"100% 但还在等后端"的错觉
+                uploadProgress.value = Math.min(99, Math.round((e.loaded / e.total) * 100))
+              }
+            }
+          }
+        : {}
+
+      const res = await uploadFile(formData, uploadConfig)
+
       if (res.success && res.data) {
         // 保存上传后的URL
         fileUrls.value.push(res.data)
+        // 视频模式：响应返回后再置 100%
+        if (noteType.value === 'video') {
+          uploadProgress.value = 100
+        }
       } else {
         console.error('文件上传失败:', res.message)
         // 从本地文件列表中移除上传失败的文件
