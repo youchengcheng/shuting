@@ -82,7 +82,7 @@ const handleLogout = () => {
   position: absolute;
   left: 0;
   bottom: calc(100% + 10px);
-  width: 220px;
+  width: 100%;
   padding: 8px;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-panel);

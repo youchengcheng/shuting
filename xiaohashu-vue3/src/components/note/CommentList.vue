@@ -96,7 +96,8 @@ const onClickComment = () => {
 
 <style scoped>
 .comment-list {
-  padding: 16px 0;
+  /* 与笔记正文左右对齐：评论列表整块缩进 24px */
+  padding: 16px 24px;
 }
 
 .comment-list__count {

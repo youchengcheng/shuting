@@ -18,7 +18,7 @@
 
             <!-- 作者信息 -->
             <div 
-              class="p-[24px] flex items-center sticky top-0 bg-paper"
+              class="note-detail__author p-[24px] flex items-center bg-paper"
               :class="{'border-b border-line': isScrolled}"
               ref="authorInfoRef"
             >
@@ -45,7 +45,7 @@
 
             <!-- 评论区域容器 -->
             <div 
-              class="overflow-y-auto flex-1" 
+              class="note-detail__scroll" 
               @scroll="handleScroll"
               ref="scrollContainerRef"
             >
@@ -55,7 +55,7 @@
                 ref="contentRef"
               >
                 <h1 class="title">{{ currNote.title }}</h1>
-                <div class="note-content whitespace-pre-wrap">{{ currNote.content }}</div>
+                <div class="note-content note-detail__body whitespace-pre-wrap">{{ currNote.content }}</div>
                 <ul v-if="currNote.topicName" class="text-ink-soft flex flex-wrap gap-2">
                   <li class="cursor-pointer">#{{currNote.topicName}}</li>
                 </ul>
@@ -83,7 +83,7 @@
             
 
             <!-- 底部互动区 -->
-            <div class="border-t border-line p-[16px]">
+            <div class="note-detail__footer border-t border-line p-[16px]">
               <div class="flex flex-col text-ink-faint text-[15px]">
                 <!-- 评论输入区域 -->
                 <div class="flex items-center gap-2">
@@ -201,6 +201,15 @@
                         <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" stroke-width="2"/>
                       </svg>
                       <span class="text-[15px] leading-none">{{ currNote.commentTotal }}</span>
+                    </div>
+                    <div 
+                      class="flex items-center gap-1 cursor-pointer hover:text-ink"
+                      @click="handleShare"
+                    >
+                      <svg class="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M22 2 11 13" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M22 2 15 22l-4-9-9-4 20-7z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
                     </div>
                   </div>
                 </div>
@@ -880,6 +889,11 @@ const handleNoteCollect = () => {
   })
 }
 
+// 分享：暂未接入分享能力，先给出占位提示
+const handleShare = () => {
+  message.show('分享功能敬请期待')
+}
+
 const handleFollow = () => {
   if (!userStore.token) {
     showLoginModal.value = true
@@ -1134,6 +1148,44 @@ input:focus::placeholder {
   border-left: 1px solid var(--color-line);
 }
 
+/* 作者行与底部互动栏不参与收缩，滚动全部交给正文 + 评论区 */
+.note-detail__author,
+.note-detail__footer {
+  flex: none;
+}
+
+/* 标题 / 正文 / 评论区共用同一条滚动流 */
+.note-detail__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@media (min-width: 1024px) {
+  /* 面板高度受限于弹层卡片：长正文由内部滚动承接，
+     而不是把评论区与底部互动栏顶出卡片 */
+  .note-detail {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .note-detail__panel {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* 令 cqh 以右栏滚动可视高度为基准（仅桌面端，避免移动端自动高度被尺寸包含压成 0） */
+  .note-detail__scroll {
+    container-type: size;
+  }
+
+  /* 正文限制在可视区约 1/3 内，超出部分在正文区域内滚动 */
+  .note-detail__body {
+    max-height: 33%;
+    max-height: 33cqh;
+    overflow-y: auto;
+  }
+}
+
 @media (max-width: 1023px) {
   .note-detail {
     grid-template-columns: minmax(0, 1fr);
@@ -1150,7 +1202,7 @@ input:focus::placeholder {
     border-top: 1px solid var(--color-line);
   }
 
-  .note-detail__panel :deep(.overflow-y-auto) {
+  .note-detail__panel .note-detail__scroll {
     overflow: visible;
   }
 }

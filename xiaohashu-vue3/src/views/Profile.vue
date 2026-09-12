@@ -1,158 +1,140 @@
 <template>
   <div class="profile-page">
-    <div class="profile-card-wrap">
-      <!-- 个人信息卡片 -->
-      <div class="profile-card">
-        <!-- 基本信息 -->
-        <div class="flex items-start">
-          <div class="avatar-wrapper">
-            <!-- 头像 -->
-            <img v-if="profile.avatar" :src="profile.avatar" class="user-image" />
-            <img v-else src="@/assets/avatar.png"  class="user-image min-w-3/4"/>
-              
-          </div>
+    <!-- 个人资料头部：对照小红书资料页，无卡片边框、整体居中 -->
+    <header class="profile-header">
+      <div class="profile-avatar">
+        <img v-if="profile.avatar" :src="profile.avatar" class="profile-avatar__img" alt="" />
+        <img v-else src="@/assets/avatar.png" class="profile-avatar__img" alt="" />
+      </div>
 
-          <!-- 用户信息 -->
-          <div class="info">
-            <div>
-              <div>
-                <div class="flex items-center gap-4">
-                  <h1 class="user-nickname min-w-0 flex-1">{{ profile.nickname }}</h1>
-                  <!-- 右侧按钮组 -->
-                  <div class="flex items-center gap-3 shrink-0">
-                    <button 
-                    v-if="!userStore.token || userStore.profile.userId !== profile.userId"
-                    @click="handleFollow"
-                    :class="isFollowing ? 'st-btn-ghost' : 'st-btn-primary'"
-                    class="st-btn w-[96px]">
-                      {{ isFollowing ? '已关注' : '关注' }}
-                    </button>
-                    <!-- 编辑按钮和下拉菜单 -->
-                    <div class="relative">
-                      <button 
-                        class="w-9 h-9 cursor-pointer border border-line hover:bg-canvas-sunken rounded-full flex items-center justify-center"
-                        @click="toggleDropdown"
-                        ref="dropdownTrigger"
-                      >
-                        <svg class="w-5 h-5 text-ink-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                          <path
-                            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                        </svg>
-                        
-                      </button>
+      <!-- 用户信息 -->
+      <div class="profile-info">
+        <div class="profile-name-row">
+          <h1 class="profile-name">{{ profile.nickname }}</h1>
+          <!-- 右侧按钮组 -->
+          <div class="profile-actions">
+            <button 
+              v-if="!userStore.token || userStore.profile.userId !== profile.userId"
+              @click="handleFollow"
+              :class="isFollowing ? 'st-btn-ghost' : 'st-btn-primary'"
+              class="st-btn w-[96px]">
+              {{ isFollowing ? '已关注' : '关注' }}
+            </button>
+            <!-- 编辑按钮和下拉菜单 -->
+            <div class="relative">
+              <button 
+                class="w-9 h-9 cursor-pointer border border-line hover:bg-canvas-sunken rounded-full flex items-center justify-center"
+                @click="toggleDropdown"
+                ref="dropdownTrigger"
+              >
+                <svg class="w-5 h-5 text-ink-soft" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path
+                    d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                </svg>
+                
+              </button>
 
-                      <!-- 下拉菜单 -->
-                      <Transition
-                        enter-active-class="transition duration-100 ease-out"
-                        enter-from-class="transform scale-95 opacity-0"
-                        enter-to-class="transform scale-100 opacity-100"
-                        leave-active-class="transition duration-75 ease-in"
-                        leave-from-class="transform scale-100 opacity-100"
-                        leave-to-class="transform scale-95 opacity-0"
-                      >
-                        <div 
-                          v-if="showDropdown"
-                          class="profile-dropdown absolute right-0 mt-2 w-[160px] bg-paper rounded-card shadow-panel p-2 z-50 border border-line"
-                        >
-                          <button 
-                            v-if="!userStore.token || userStore.profile.userId === profile.userId"
-                            class="w-full px-4 py-2 text-left text-ink-soft hover:text-ink 
-                            hover:bg-canvas-sunken flex items-center rounded-lg cursor-pointer"
-                            @click="editProfile"
-                          >
-                            <svg t="1740136979710" class="icon w-5 h-5 mr-2" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="12707" width="200" height="200"><path d="M510.528 337.792c-98.048 0-177.792 78.848-177.792 175.744 0 96.96 79.744 175.808 177.792 175.808 9.536 0 19.584-1.024 31.744-3.136a33.152 33.152 0 0 0 27.008-38.4 33.28 33.28 0 0 0-38.912-26.624 114.048 114.048 0 0 1-19.84 2.048 110.4 110.4 0 0 1-110.848-109.696c0-60.416 49.664-109.632 110.72-109.632 61.12 0 110.848 49.216 110.848 109.632 0 5.952-0.64 12.16-2.112 19.584a33.152 33.152 0 0 0 33.024 39.04c16.256 0 30.08-11.52 32.832-27.2 2.176-11.392 3.2-21.376 3.2-31.36 0-46.912-18.496-91.008-52.096-124.224a177.536 177.536 0 0 0-125.568-51.584z" p-id="12708" fill="#57514A"></path><path d="M938.56 432.768a29.504 29.504 0 0 0-22.528-23.04 151.104 151.104 0 0 1-98.24-71.616 148.352 148.352 0 0 1-13.632-119.68 28.928 28.928 0 0 0-8.96-30.848 435.84 435.84 0 0 0-141.696-80.896 29.888 29.888 0 0 0-31.552 7.744 151.68 151.68 0 0 1-111.488 48.128 151.872 151.872 0 0 1-111.616-48.192 30.464 30.464 0 0 0-31.552-7.744c-52.48 18.176-100.16 45.44-141.632 80.96a29.184 29.184 0 0 0-8.96 30.72c12.608 40.64 7.744 83.2-13.568 119.744A150.848 150.848 0 0 1 104.96 409.6a29.696 29.696 0 0 0-22.592 23.168 428.8 428.8 0 0 0-7.872 80.768c0 26.432 2.624 53.632 7.872 80.768 2.176 11.456 11.008 20.48 22.528 23.104 41.92 9.6 76.8 34.944 98.24 71.552 21.312 36.608 26.176 79.168 13.568 119.808a29.44 29.44 0 0 0 8.96 30.72 436.48 436.48 0 0 0 141.696 80.96c11.456 3.84 23.68 0.512 31.424-7.68a151.872 151.872 0 0 1 111.616-48.256c42.624 0 82.304 17.152 111.552 48.192a29.888 29.888 0 0 0 31.616 7.808 436.48 436.48 0 0 0 141.632-80.896 29.44 29.44 0 0 0 8.96-30.72 147.84 147.84 0 0 1 13.632-119.808c21.376-36.672 56.192-62.08 98.24-71.552a29.76 29.76 0 0 0 22.528-23.104 429.44 429.44 0 0 0 7.872-80.768 430.08 430.08 0 0 0-7.872-80.896z m-209.92 357.12a352.896 352.896 0 0 1-85.44 48.832 201.728 201.728 0 0 0-265.6 0 353.28 353.28 0 0 1-85.44-48.832 194.816 194.816 0 0 0-22.784-138.624 199.424 199.424 0 0 0-110.208-88.832 339.84 339.84 0 0 1 0-97.728A199.488 199.488 0 0 0 269.44 375.872a195.84 195.84 0 0 0 22.72-138.624A353.28 353.28 0 0 1 377.6 188.416c36.8 32.192 83.776 49.92 132.8 49.92 49.152 0 96.128-17.664 132.8-49.856 30.72 12.288 59.456 28.672 85.44 48.832a195.648 195.648 0 0 0 22.656 138.624c24.448 41.984 63.424 73.344 110.208 88.832a341.12 341.12 0 0 1 0.064 97.664c-46.72 15.488-85.76 46.848-110.144 88.832a196.224 196.224 0 0 0-22.784 138.624z" p-id="12709" fill="#57514A"></path></svg>
-                            编辑资料
-                          </button>
-                          <button 
-                            class=" cursor-not-allowed w-full px-4 py-2 text-left text-ink-soft hover:text-ink 
-                            hover:bg-canvas-sunken flex items-center rounded-lg"
-                          >
-                          <svg t="1741424760279" class="  icon w-4 h-4 mr-2.5 ml-[1px]" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1684" width="200" height="200"><path d="M512 93.098667a418.901333 418.901333 0 1 0 0 837.802666c231.367111 0 418.901333-187.534222 418.901333-418.901333S743.367111 93.098667 512 93.098667zM0 512C0 229.262222 229.262222 0 512 0s512 229.262222 512 512-229.262222 512-512 512S0 794.737778 0 512z" fill="#57514A" p-id="1685"></path><path d="M564.622222 373.020444c11.235556 10.126222 16.867556 25.258667 15.018667 40.419556l-37.319111 303.729778 26.567111-6.769778a44.942222 44.942222 0 0 1 44.003555 12.572444c11.377778 11.946667 15.644444 29.155556 11.093334 45.141334a45.880889 45.880889 0 0 1-32.995556 32.199111l-91.022222 23.182222a44.913778 44.913778 0 0 1-41.187556-10.24 46.819556 46.819556 0 0 1-14.990222-40.476444l37.262222-303.701334-26.567111 6.769778a45.454222 45.454222 0 0 1-54.897777-33.792c-6.058667-24.689778 8.561778-49.777778 32.768-56.149333l91.022222-23.153778a44.913778 44.913778 0 0 1 41.244444 10.268444zM443.448889 245.475556c0-25.6 20.366222-46.364444 45.511111-46.364445h45.482667c25.144889 0 45.511111 20.764444 45.511111 46.364445 0 25.6-20.366222 46.364444-45.511111 46.364444h-45.511111c-12.060444 0-23.637333-4.892444-32.170667-13.596444-8.533333-8.704-13.340444-20.48-13.340445-32.768z" fill="#57514A" p-id="1686"></path></svg>
-                            举报
-                          </button>
-                        </div>
-                      </Transition>
-                    </div>
-                  </div>
-                  
+              <!-- 下拉菜单 -->
+              <Transition
+                enter-active-class="transition duration-100 ease-out"
+                enter-from-class="transform scale-95 opacity-0"
+                enter-to-class="transform scale-100 opacity-100"
+                leave-active-class="transition duration-75 ease-in"
+                leave-from-class="transform scale-100 opacity-100"
+                leave-to-class="transform scale-95 opacity-0"
+              >
+                <div 
+                  v-if="showDropdown"
+                  class="profile-dropdown absolute right-0 mt-2 w-[160px] bg-paper rounded-card shadow-panel p-2 z-50 border border-line"
+                >
+                  <button 
+                    v-if="!userStore.token || userStore.profile.userId === profile.userId"
+                    class="w-full px-4 py-2 text-left text-ink-soft hover:text-ink 
+                    hover:bg-canvas-sunken flex items-center rounded-lg cursor-pointer"
+                    @click="editProfile"
+                  >
+                    <svg t="1740136979710" class="icon w-5 h-5 mr-2" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="12707" width="200" height="200"><path d="M510.528 337.792c-98.048 0-177.792 78.848-177.792 175.744 0 96.96 79.744 175.808 177.792 175.808 9.536 0 19.584-1.024 31.744-3.136a33.152 33.152 0 0 0 27.008-38.4 33.28 33.28 0 0 0-38.912-26.624 114.048 114.048 0 0 1-19.84 2.048 110.4 110.4 0 0 1-110.848-109.696c0-60.416 49.664-109.632 110.72-109.632 61.12 0 110.848 49.216 110.848 109.632 0 5.952-0.64 12.16-2.112 19.584a33.152 33.152 0 0 0 33.024 39.04c16.256 0 30.08-11.52 32.832-27.2 2.176-11.392 3.2-21.376 3.2-31.36 0-46.912-18.496-91.008-52.096-124.224a177.536 177.536 0 0 0-125.568-51.584z" p-id="12708" fill="#57514A"></path><path d="M938.56 432.768a29.504 29.504 0 0 0-22.528-23.04 151.104 151.104 0 0 1-98.24-71.616 148.352 148.352 0 0 1-13.632-119.68 28.928 28.928 0 0 0-8.96-30.848 435.84 435.84 0 0 0-141.696-80.896 29.888 29.888 0 0 0-31.552 7.744 151.68 151.68 0 0 1-111.488 48.128 151.872 151.872 0 0 1-111.616-48.192 30.464 30.464 0 0 0-31.552-7.744c-52.48 18.176-100.16 45.44-141.632 80.96a29.184 29.184 0 0 0-8.96 30.72c12.608 40.64 7.744 83.2-13.568 119.744A150.848 150.848 0 0 1 104.96 409.6a29.696 29.696 0 0 0-22.592 23.168 428.8 428.8 0 0 0-7.872 80.768c0 26.432 2.624 53.632 7.872 80.768 2.176 11.456 11.008 20.48 22.528 23.104 41.92 9.6 76.8 34.944 98.24 71.552 21.312 36.608 26.176 79.168 13.568 119.808a29.44 29.44 0 0 0 8.96 30.72 436.48 436.48 0 0 0 141.696 80.96c11.456 3.84 23.68 0.512 31.424-7.68a151.872 151.872 0 0 1 111.616-48.256c42.624 0 82.304 17.152 111.552 48.192a29.888 29.888 0 0 0 31.616 7.808 436.48 436.48 0 0 0 141.632-80.896 29.44 29.44 0 0 0 8.96-30.72 147.84 147.84 0 0 1 13.632-119.808c21.376-36.672 56.192-62.08 98.24-71.552a29.76 29.76 0 0 0 22.528-23.104 429.44 429.44 0 0 0 7.872-80.768 430.08 430.08 0 0 0-7.872-80.896z m-209.92 357.12a352.896 352.896 0 0 1-85.44 48.832 201.728 201.728 0 0 0-265.6 0 353.28 353.28 0 0 1-85.44-48.832 194.816 194.816 0 0 0-22.784-138.624 199.424 199.424 0 0 0-110.208-88.832 339.84 339.84 0 0 1 0-97.728A199.488 199.488 0 0 0 269.44 375.872a195.84 195.84 0 0 0 22.72-138.624A353.28 353.28 0 0 1 377.6 188.416c36.8 32.192 83.776 49.92 132.8 49.92 49.152 0 96.128-17.664 132.8-49.856 30.72 12.288 59.456 28.672 85.44 48.832a195.648 195.648 0 0 0 22.656 138.624c24.448 41.984 63.424 73.344 110.208 88.832a341.12 341.12 0 0 1 0.064 97.664c-46.72 15.488-85.76 46.848-110.144 88.832a196.224 196.224 0 0 0-22.784 138.624z" p-id="12709" fill="#57514A"></path></svg>
+                    编辑资料
+                  </button>
+                  <button 
+                    class=" cursor-not-allowed w-full px-4 py-2 text-left text-ink-soft hover:text-ink 
+                    hover:bg-canvas-sunken flex items-center rounded-lg"
+                  >
+                  <svg t="1741424760279" class="  icon w-4 h-4 mr-2.5 ml-[1px]" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1684" width="200" height="200"><path d="M512 93.098667a418.901333 418.901333 0 1 0 0 837.802666c231.367111 0 418.901333-187.534222 418.901333-418.901333S743.367111 93.098667 512 93.098667zM0 512C0 229.262222 229.262222 0 512 0s512 229.262222 512 512-229.262222 512-512 512S0 794.737778 0 512z" fill="#57514A" p-id="1685"></path><path d="M564.622222 373.020444c11.235556 10.126222 16.867556 25.258667 15.018667 40.419556l-37.319111 303.729778 26.567111-6.769778a44.942222 44.942222 0 0 1 44.003555 12.572444c11.377778 11.946667 15.644444 29.155556 11.093334 45.141334a45.880889 45.880889 0 0 1-32.995556 32.199111l-91.022222 23.182222a44.913778 44.913778 0 0 1-41.187556-10.24 46.819556 46.819556 0 0 1-14.990222-40.476444l37.262222-303.701334-26.567111 6.769778a45.454222 45.454222 0 0 1-54.897777-33.792c-6.058667-24.689778 8.561778-49.777778 32.768-56.149333l91.022222-23.153778a44.913778 44.913778 0 0 1 41.244444 10.268444zM443.448889 245.475556c0-25.6 20.366222-46.364444 45.511111-46.364445h45.482667c25.144889 0 45.511111 20.764444 45.511111 46.364445 0 25.6-20.366222 46.364444-45.511111 46.364444h-45.511111c-12.060444 0-23.637333-4.892444-32.170667-13.596444-8.533333-8.704-13.340444-20.48-13.340445-32.768z" fill="#57514A" p-id="1686"></path></svg>
+                    举报
+                  </button>
                 </div>
-
-
-              </div>
-
-              <div class="user-content">
-                    <span>书亭号：{{ profile.xiaohashuId }}</span>
-                    <span class="mx-2">|</span>
-                    <span>IP属地：中国</span>
-                  </div>
-
-              <!-- 个人简介 -->
-              <div class="user-desc">
-                {{ profile.introduction || '此用户还未填写简介'}}
-              </div>
-
-              <!-- 性别年龄地区 -->
-              <div class="flex items-center mt-[16px] text-[12px]">
-                <span class="user-tag">
-                  <svg v-if="userStore.profile.sex === 0" t="1740127656798" class="icon w-3 h-2.5 text-ink-faint" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9302" width="200" height="200"><path d="M512 93.090909c130.327273 0 232.727273 102.4 232.727273 232.727273s-102.4 232.727273-232.727273 232.727273-232.727273-102.4-232.727273-232.727273 102.4-232.727273 232.727273-232.727273m-46.545455 553.890909v97.745455h-186.181818c-27.927273 0-46.545455 18.618182-46.545454 46.545454s18.618182 46.545455 46.545454 46.545455h186.181818v139.636363c0 23.272727 23.272727 46.545455 46.545455 46.545455 27.927273 0 46.545455-23.272727 46.545455-46.545455v-139.636363h186.181818c27.927273 0 46.545455-18.618182 46.545454-46.545455s-18.618182-46.545455-46.545454-46.545454h-186.181818v-97.745455c176.872727-27.927273 302.545455-190.836364 274.618181-367.709091-27.927273-176.872727-190.836364-302.545455-367.709091-274.618182-176.872727 27.927273-302.545455 190.836364-274.618181 367.709091 18.618182 144.290909 130.327273 256 274.618181 274.618182" fill="currentColor" p-id="9303"></path></svg>
-                  <svg v-else t="1740547397483" class="icon w-3 h-2.5 text-ink-faint" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="13790" width="200" height="200"><path d="M914.285714 0 658.285714 0l0 109.714286 178.428343 0-160.393143 160.393143C605.429029 215.606857 516.928 182.857143 420.571429 182.857143 188.286171 182.857143 0 371.143314 0 603.428571s188.286171 420.571429 420.571429 420.571429 420.571429-188.286171 420.571429-420.571429c0-96.356571-32.749714-184.8576-87.250286-255.749486L914.285714 187.285943 914.285714 365.714286l109.714286 0L1024 109.714286 1024 0 914.285714 0zM420.571429 914.285714c-171.392 0-310.857143-139.465143-310.857143-310.857143s139.465143-310.857143 310.857143-310.857143 310.857143 139.465143 310.857143 310.857143S591.963429 914.285714 420.571429 914.285714z" fill="currentColor" p-id="13791"></path></svg>
-                  {{ profile.age || 0 }}岁
-                </span>
-                <span class="user-tag">中国</span>
-              </div>
-
-              <!-- 数据统计 -->
-              <div class="flex items-center gap-8 mt-[20px]">
-                <router-link :to="`/user/${profile.userId}/relation?tab=following`" class="flex items-center cursor-pointer">
-                  <div class="text-[16px] font-medium text-ink mr-[4px]">{{ profile.followingTotal || 0 }}</div>
-                  <div class="text-[13px] text-ink-faint">关注</div>
-                </router-link>
-                <router-link :to="`/user/${profile.userId}/relation?tab=followers`" class="flex items-center cursor-pointer">
-                  <div class="text-[16px] font-medium text-ink mr-[4px]">{{ profile.fansTotal || 0}}</div>
-                  <div class="text-[13px] text-ink-faint">粉丝</div>
-                </router-link>
-                <div class="flex items-center">
-                  <div class="text-[16px] font-medium text-ink mr-[4px]">{{ profile.likeAndCollectTotal || 0 }}</div>
-                  <div class="text-[13px] text-ink-faint">获赞与收藏</div>
-                </div>
-              </div>
+              </Transition>
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-          <!-- Tab 导航 -->
-          <div class="profile-tabs">
-        <TabNav
-          v-model="activeTab"
-          :tabs="tabList"
-        />
-        
-        <!-- 笔记列表：笔记 / 收藏 / 赞过 共用一个瀑布流 -->
-        <div class="profile-notes">
-          <NoteWaterfall
-            :notes="notes"
-            :loading="loading"
-            :loading-more="loadingMore"
-            :has-more="hasMore"
-            @note-click="onNoteClick"
-            @load-more="loadMoreNotes"
-          />
-          <EmptyState
-            v-if="!loading && notes.length === 0"
-            :title="emptyState.title"
-            :description="emptyState.description"
-          />
+        <div class="profile-id">书亭号：{{ profile.xiaohashuId }}</div>
+
+        <!-- 个人简介 -->
+        <div class="profile-bio">
+          {{ profile.introduction || '此用户还未填写简介' }}
+        </div>
+
+        <!-- 性别年龄地区 -->
+        <div class="profile-tags">
+          <span class="user-tag">
+            <svg v-if="userStore.profile.sex === 0" t="1740127656798" class="icon w-3 h-2.5 text-ink-faint" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9302" width="200" height="200"><path d="M512 93.090909c130.327273 0 232.727273 102.4 232.727273 232.727273s-102.4 232.727273-232.727273 232.727273-232.727273-102.4-232.727273-232.727273 102.4-232.727273 232.727273-232.727273m-46.545455 553.890909v97.745455h-186.181818c-27.927273 0-46.545455 18.618182-46.545454 46.545454s18.618182 46.545455 46.545454 46.545455h186.181818v139.636363c0 23.272727 23.272727 46.545455 46.545455 46.545455 27.927273 0 46.545455-23.272727 46.545455-46.545455v-139.636363h186.181818c27.927273 0 46.545455-18.618182 46.545454-46.545455s-18.618182-46.545455-46.545454-46.545454h-186.181818v-97.745455c176.872727-27.927273 302.545455-190.836364 274.618181-367.709091-27.927273-176.872727-190.836364-302.545455-367.709091-274.618182-176.872727 27.927273-302.545455 190.836364-274.618181 367.709091 18.618182 144.290909 130.327273 256 274.618181 274.618182" fill="currentColor" p-id="9303"></path></svg>
+            <svg v-else t="1740547397483" class="icon w-3 h-2.5 text-ink-faint" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="13790" width="200" height="200"><path d="M914.285714 0 658.285714 0l0 109.714286 178.428343 0-160.393143 160.393143C605.429029 215.606857 516.928 182.857143 420.571429 182.857143 188.286171 182.857143 0 371.143314 0 603.428571s188.286171 420.571429 420.571429 420.571429 420.571429-188.286171 420.571429-420.571429c0-96.356571-32.749714-184.8576-87.250286-255.749486L914.285714 187.285943 914.285714 365.714286l109.714286 0L1024 109.714286 1024 0 914.285714 0zM420.571429 914.285714c-171.392 0-310.857143-139.465143-310.857143-310.857143s139.465143-310.857143 310.857143-310.857143 310.857143 139.465143 310.857143 310.857143S591.963429 914.285714 420.571429 914.285714z" fill="currentColor" p-id="13791"></path></svg>
+            {{ profile.age || 0 }}岁
+          </span>
+          <span class="user-tag">中国</span>
+        </div>
+
+        <!-- 数据统计 -->
+        <div class="profile-stats">
+          <router-link :to="`/user/${profile.userId}/relation?tab=following`" class="profile-stat">
+            <span class="profile-stat__num">{{ profile.followingTotal || 0 }}</span>
+            <span class="profile-stat__label">关注</span>
+          </router-link>
+          <router-link :to="`/user/${profile.userId}/relation?tab=followers`" class="profile-stat">
+            <span class="profile-stat__num">{{ profile.fansTotal || 0 }}</span>
+            <span class="profile-stat__label">粉丝</span>
+          </router-link>
+          <div class="profile-stat">
+            <span class="profile-stat__num">{{ profile.likeAndCollectTotal || 0 }}</span>
+            <span class="profile-stat__label">获赞与收藏</span>
+          </div>
         </div>
       </div>
+    </header>
 
-          <!-- 编辑资料模态框 -->
-          <EditProfileModal 
-            v-model:visible="showEditModal" 
-            :avatar="profile.avatar"
-            @update-success="handleProfileUpdated"
-          />
+    <!-- Tab 导航 -->
+    <div class="profile-tabs">
+      <TabNav
+        v-model="activeTab"
+        :tabs="tabList"
+      />
+    </div>
+
+    <!-- 笔记列表：笔记 / 收藏 / 点赞 共用一个瀑布流 -->
+    <div class="profile-notes">
+      <NoteWaterfall
+        :notes="notes"
+        :loading="loading"
+        :loading-more="loadingMore"
+        :has-more="hasMore"
+        @note-click="onNoteClick"
+        @load-more="loadMoreNotes"
+      />
+      <EmptyState
+        v-if="!loading && notes.length === 0"
+        :title="emptyState.title"
+        :description="emptyState.description"
+      />
+    </div>
+
+    <!-- 编辑资料模态框 -->
+    <EditProfileModal 
+      v-model:visible="showEditModal" 
+      :avatar="profile.avatar"
+      @update-success="handleProfileUpdated"
+    />
   </div>
 </template>
 
@@ -243,11 +225,11 @@ const handleClickOutside = (event) => {
 const profile = ref({})
 const isFollowing = ref(false)
 
-// Tab 导航配置：与小红书一致（笔记 / 收藏 / 赞过）；“笔记”数量使用后端返回的真实数据
+// Tab 导航配置：与小红书一致（笔记 / 收藏 / 点赞）；“笔记”数量使用后端返回的真实数据
 const tabList = computed(() => [
   { key: 'notes', label: '笔记', icon: 'note', count: profile.value.noteTotal },
   { key: 'like', label: '收藏', icon: 'collect' },
-  { key: 'collect', label: '赞过', icon: 'like' }
+  { key: 'collect', label: '点赞', icon: 'like' }
 ])
 
 // 当前 tab 对应的空态文案
@@ -255,7 +237,7 @@ const emptyState = computed(() => {
   const map = {
     notes: { title: '还没有发布笔记', description: '发布第一篇笔记，记录你的生活' },
     like: { title: '还没有收藏的笔记', description: '收藏一些喜欢的内容，会出现在这里' },
-    collect: { title: '还没有赞过的笔记', description: '点赞过的笔记会出现在这里' }
+    collect: { title: '还没有点赞的笔记', description: '点赞过的笔记会出现在这里' }
   }
   return map[activeTab.value] || map.notes
 })
@@ -468,21 +450,24 @@ watch(() => route.params.userId, (newUserId, oldUserId) => {
   flex-direction: column;
 }
 
-/* 资料卡：白底 + 细描边，头像在左、信息在右 */
-.profile-card {
-  padding: 32px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-paper);
+/* 资料头部：头像在左、信息在右，整体居中且无卡片边框（贴近小红书资料页） */
+.profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 40px 0 8px;
 }
 
-.avatar-wrapper {
+.profile-avatar {
   flex-shrink: 0;
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
 }
 
-.user-image {
+.profile-avatar__img {
   width: 100%;
   height: 100%;
   border-radius: var(--radius-pill);
@@ -490,13 +475,20 @@ watch(() => route.params.userId, (newUserId, oldUserId) => {
   background: var(--color-canvas-sunken);
 }
 
-.info {
+.profile-info {
   flex: 1;
   min-width: 0;
-  margin-left: 28px;
 }
 
-.user-nickname {
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.profile-name {
+  flex: 1;
+  min-width: 0;
   font-weight: 600;
   font-size: 24px;
   line-height: 1.3;
@@ -506,19 +498,57 @@ watch(() => route.params.userId, (newUserId, oldUserId) => {
   text-overflow: ellipsis;
 }
 
-.user-content {
+.profile-actions {
   display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.profile-id {
   margin-top: 8px;
   font-size: 13px;
   color: var(--color-ink-faint);
 }
 
-.user-desc {
-  margin-top: 12px;
-  font-size: 14px;
+.profile-bio {
+  margin-top: 14px;
+  font-size: 15px;
   line-height: 1.7;
   color: var(--color-ink);
   white-space: pre-line;
+}
+
+.profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.profile-stats {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-top: 18px;
+}
+
+.profile-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.profile-stat__num {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+.profile-stat__label {
+  font-size: 13px;
+  color: var(--color-ink-faint);
 }
 
 .user-tag {
@@ -527,7 +557,6 @@ watch(() => route.params.userId, (newUserId, oldUserId) => {
   gap: 4px;
   height: 24px;
   padding: 0 10px;
-  margin-right: 8px;
   border-radius: var(--radius-pill);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
@@ -541,13 +570,30 @@ watch(() => route.params.userId, (newUserId, oldUserId) => {
   margin-top: 28px;
 }
 
-/* 笔记 / 收藏 / 赞过 三个 tab 共用同一个瀑布流容器 */
+/* 笔记 / 收藏 / 点赞 三个 tab 共用同一个瀑布流容器 */
 .profile-notes {
+  width: 100%;
   margin-top: 20px;
 }
 
 /* 下拉菜单里的矢量图标跟随文字颜色 */
 .profile-dropdown svg path {
   fill: currentColor;
+}
+
+@media (max-width: 767px) {
+  .profile-header {
+    gap: 20px;
+    padding: 24px 0 8px;
+  }
+
+  .profile-avatar {
+    width: 80px;
+    height: 80px;
+  }
+
+  .profile-name {
+    font-size: 20px;
+  }
 }
 </style>
