@@ -135,6 +135,13 @@
       :avatar="profile.avatar"
       @update-success="handleProfileUpdated"
     />
+
+    <!-- 笔记详情浮层：以子路由渲染，关闭时只卸载浮层，当前主页不会重新加载 -->
+    <router-view v-slot="{ Component }">
+      <Transition name="note-overlay">
+        <component :is="Component" />
+      </Transition>
+    </router-view>
   </div>
 </template>
 
@@ -173,11 +180,14 @@ let loadSeq = 0
 
 
 
-// 点击笔记卡片时的处理函数
+// 点击笔记卡片：打开详情浮层（子路由），当前主页保持挂载
 const onNoteClick = (note) => {
   const noteId = note.id ?? note.noteId
   if (!noteId) return
-  router.push({ name: 'NoteDetail', params: { noteId } })
+  router.push({
+    path: `${route.path}/note/${noteId}`,
+    query: route.query
+  })
 }
 
 // 下拉菜单状态
@@ -228,16 +238,16 @@ const isFollowing = ref(false)
 // Tab 导航配置：与小红书一致（笔记 / 收藏 / 点赞）；“笔记”数量使用后端返回的真实数据
 const tabList = computed(() => [
   { key: 'notes', label: '笔记', icon: 'note', count: profile.value.noteTotal },
-  { key: 'like', label: '收藏', icon: 'collect' },
-  { key: 'collect', label: '点赞', icon: 'like' }
+  { key: 'like', label: '点赞', icon: 'collect' },
+  { key: 'collect', label: '收藏', icon: 'like' }
 ])
 
 // 当前 tab 对应的空态文案
 const emptyState = computed(() => {
   const map = {
     notes: { title: '还没有发布笔记', description: '发布第一篇笔记，记录你的生活' },
-    like: { title: '还没有收藏的笔记', description: '收藏一些喜欢的内容，会出现在这里' },
-    collect: { title: '还没有点赞的笔记', description: '点赞过的笔记会出现在这里' }
+    like:{ title: '还没有点赞的笔记', description: '点赞过的笔记会出现在这里' },
+    collect:  { title: '还没有收藏的笔记', description: '收藏一些喜欢的内容，会出现在这里' }
   }
   return map[activeTab.value] || map.notes
 })

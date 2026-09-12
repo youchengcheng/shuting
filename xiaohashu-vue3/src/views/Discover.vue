@@ -30,6 +30,13 @@
     >
       <button class="retry-btn" @click="retry">重新加载</button>
     </EmptyState>
+
+    <!-- 笔记详情浮层：以子路由渲染，关闭时只卸载浮层，当前信息流不会重新加载 -->
+    <router-view v-slot="{ Component }">
+      <Transition name="note-overlay">
+        <component :is="Component" />
+      </Transition>
+    </router-view>
   </div>
 </template>
 
@@ -39,11 +46,13 @@ import NoteWaterfall from '@/components/note/NoteWaterfall.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { getDiscoverNotePageList } from '@/api/note'
+import { useNoteStore } from '@/stores/note'
 import { useRoute, useRouter } from 'vue-router'
 
 
 const route = useRoute()
 const router = useRouter()
+const noteStore = useNoteStore()
 
 // 笔记数据
 const notes = ref([])
@@ -147,11 +156,14 @@ const updateRouteQuery = (channelId) => {
   })
 }
 
-// 点击笔记卡片：跳转整页详情
+// 点击笔记卡片：打开详情浮层（子路由），当前信息流保持挂载
 const onNoteClick = (note) => {
   const noteId = note.id ?? note.noteId
   if (!noteId) return
-  router.push({ name: 'NoteDetail', params: { noteId } })
+  router.push({
+    path: `${route.path}/note/${noteId}`,
+    query: route.query
+  })
 }
 
 // 监听滚动事件，检测是否滚动到底部
@@ -192,6 +204,12 @@ watch(() => route.query.channelId, (newChannelId) => {
     loadNotes(channelId, true)
   }
 }, { immediate: true })
+
+// 发布 / 删除笔记后刷新信息流，替代整页刷新
+watch(() => noteStore.discoverRefreshToken, () => {
+  loadNotes(activeChannelId.value, true)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+})
 </script>
 
 <style scoped>

@@ -13,7 +13,22 @@
     >
       <!-- 发布笔记模态框 -->
       <div v-if="visible" class="fixed inset-0 z-[101] flex items-center justify-center p-4">
-        <div class="bg-paper w-[800px] rounded-panel flex flex-col max-h-[90vh] shadow-panel">
+        <div class="relative bg-paper w-[800px] rounded-panel flex flex-col max-h-[90vh] shadow-panel">
+          <!-- 发布中 / 发布成功：过渡浮层 -->
+          <Transition name="publish-state">
+            <div v-if="isPublishing || isPublishSuccess" class="publish-state">
+              <div class="publish-state__inner">
+                <span v-if="isPublishSuccess" class="publish-state__check">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 12.6l5.1 5.1L20 7.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+                <span v-else class="publish-state__spinner" aria-hidden="true"></span>
+                <p class="publish-state__text">{{ isPublishSuccess ? '发布成功' : '正在发布，请稍候…' }}</p>
+              </div>
+            </div>
+          </Transition>
+
           <!-- 顶部标题栏 - 优化间距和分割线 -->
           <div class="p-[24px] flex items-center justify-between px-8 border-b border-line/60 shrink-0">
             <h2 class="text-[18px] font-semibold text-ink">发布笔记</h2>
@@ -462,16 +477,19 @@
               <!-- 取消按钮 -->
               <button 
                 class="st-btn st-btn-ghost w-32 h-12 text-[16px]"
+                :disabled="isPublishing"
                 @click="onClose"
               >
                 取消
               </button>
               <!-- 发布按钮 -->
               <button 
-                class="st-btn st-btn-primary flex-1 h-12 text-[16px]"
+                class="st-btn st-btn-primary flex-1 h-12 text-[16px] flex items-center justify-center gap-2"
+                :disabled="isPublishing"
                 @click="handlePublish"
               >
-                发布笔记
+                <span v-if="isPublishing" class="publish-state__spinner publish-state__spinner--sm" aria-hidden="true"></span>
+                {{ isPublishing ? '发布中…' : '发布笔记' }}
               </button>
             </div>
           </div>
@@ -512,9 +530,15 @@ import { getTopicList } from '@/api/topic'
 import { uploadFile } from '@/api/file'
 import { publishNote } from '@/api/note'
 import { message } from '@/utils/message'
+import { useNoteStore } from '@/stores/note'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+const noteStore = useNoteStore()
+
+// 发布过渡状态：发布中显示遮罩与按钮 loading，发布成功播放勾选动画后再关闭弹窗
+const isPublishing = ref(false)
+const isPublishSuccess = ref(false)
 
 const props = defineProps({
   visible: {
@@ -979,6 +1003,9 @@ const handlePublish = async () => {
     message.show({ type: 'warning', content: '请上传文件' })
     return
   }
+
+  // 发布中，忽略重复点击
+  if (isPublishing.value) return
   
   try {
     // 数据库当前以单个 topic_id 关联笔记，前端也只提交第一个话题。
@@ -1010,19 +1037,27 @@ const handlePublish = async () => {
     console.log('发布笔记数据:', noteData)
     
     // 调用发布接口
+    isPublishing.value = true
     const res = await publishNote(noteData)
     
     if (res.success) {
-      // 发布成功
+      // 发布成功：先播放成功过渡动画，再关闭弹窗并平滑刷新信息流
+      isPublishing.value = false
+      isPublishSuccess.value = true
       message.show('发布成功')
-      onClose()
-      router.push('/discover')
-      location.reload()
+      setTimeout(() => {
+        isPublishSuccess.value = false
+        onClose()
+        router.push('/discover')
+        noteStore.requestDiscoverRefresh()
+      }, 750)
     } else {
       // 发布失败
+      isPublishing.value = false
       message.show(res.message || '未知错误')
     }
   } catch (error) {
+    isPublishing.value = false
     console.error('发布笔记出错:', error)
     message.show('发布失败')
   }
@@ -1030,6 +1065,9 @@ const handlePublish = async () => {
 
 // 修改关闭处理，重置所有状态
 const onClose = () => {
+  // 发布进行中不允许关闭，避免请求中途中断导致状态错乱
+  if (isPublishing.value) return
+
   emit('update:visible', false)
   title.value = ''
   content.value = ''
@@ -1049,6 +1087,7 @@ const onClose = () => {
     channel: false
   }
   selectedChannel.value = null
+  isPublishSuccess.value = false
 }
 
 // 分别监听每个字段，只清除对应的错误
@@ -1196,4 +1235,98 @@ textarea:focus::placeholder {
 .cursor-grab:active {
   cursor: grabbing;
 }
-</style> 
+
+/* 发布中 / 发布成功 的过渡浮层 */
+.publish-state {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: rgb(255 255 255 / 0.72);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.publish-state__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.publish-state__text {
+  font-size: 15px;
+  color: var(--color-ink);
+}
+
+.publish-state__spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  border: 3px solid rgb(255 36 66 / 0.18);
+  border-top-color: var(--color-brand);
+  animation: publish-spin 720ms linear infinite;
+}
+
+.publish-state__spinner--sm {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+  border-color: rgb(255 255 255 / 0.45);
+  border-top-color: #fff;
+}
+
+.publish-state__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-brand);
+  animation: publish-pop 320ms var(--ease-standard);
+}
+
+.publish-state__check svg {
+  width: 44px;
+  height: 44px;
+}
+
+.publish-state-enter-active,
+.publish-state-leave-active {
+  transition: opacity 200ms var(--ease-standard);
+}
+
+.publish-state-enter-from,
+.publish-state-leave-to {
+  opacity: 0;
+}
+
+@keyframes publish-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes publish-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .publish-state__spinner {
+    animation-duration: 1.6s;
+  }
+
+  .publish-state-enter-active,
+  .publish-state-leave-active {
+    transition-duration: 1ms;
+  }
+}
+</style>

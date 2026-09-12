@@ -10,7 +10,6 @@ public interface VerificationCodeService {
 
     /**
      * 发送短信验证码
-     *
      * @param sendVerificationCodeReqVO
      * @return
      */

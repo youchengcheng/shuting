@@ -170,6 +170,13 @@
         description="换个关键词，或减少筛选条件"
       />
     </div>
+
+    <!-- 笔记详情浮层：以子路由渲染，关闭时只卸载浮层，搜索结果不会重新加载 -->
+    <router-view v-slot="{ Component }">
+      <Transition name="note-overlay">
+        <component :is="Component" />
+      </Transition>
+    </router-view>
   </div>
 </template>
 
@@ -406,11 +413,14 @@ onUnmounted(() => {
 })
 
 
-// 点击笔记卡片
+// 点击笔记卡片：打开详情浮层（子路由），当前搜索结果保持挂载
 const onNoteClick = (note) => {
   const noteId = note.id ?? note.noteId
   if (!noteId) return
-  router.push({ name: 'NoteDetail', params: { noteId } })
+  router.push({
+    path: `${route.path}/note/${noteId}`,
+    query: route.query
+  })
 }
 
 // 处理用户关注/取消关注事件
