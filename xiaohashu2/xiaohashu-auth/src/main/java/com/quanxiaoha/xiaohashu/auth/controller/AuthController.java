@@ -11,11 +11,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * @author: 犬小哈
- * @date: 2024/5/29 15:32
- * @version: v1.0.0
- * @description: TODO
- **/
+ * TODO
+ */
 @RestController
 //@RequestMapping("/user")
 @Slf4j

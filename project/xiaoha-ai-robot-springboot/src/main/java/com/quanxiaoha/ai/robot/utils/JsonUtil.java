@@ -15,11 +15,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * @author: 犬小哈
- * @url: www.quanxiaoha.com
- * @date: 2023-08-14 16:27
- * @description: JSON 工具类
- **/
+ * JSON 工具类
+ */
 public class JsonUtil {
 
     private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();

@@ -6,11 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * @author: 犬小哈
- * @date: 2024/4/7 15:17
- * @version: v1.0.0
- * @description: 聚合后计数：收藏、取消收藏笔记
- **/
+ * 聚合后计数：收藏、取消收藏笔记
+ */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

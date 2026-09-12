@@ -12,11 +12,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * @author: 犬小哈
- * @date: 2024/4/4 13:22
- * @version: v1.0.0
- * @description: 验证码
- **/
+ * 验证码
+ */
 @RestController
 @Slf4j
 public class VerificationCodeController {

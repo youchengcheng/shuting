@@ -22,11 +22,8 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 /**
- * @author: 犬小哈
- * @date: 2024/8/9 11:52
- * @version: v1.0.0
- * @description: 笔记收藏、取消收藏 MQ 消费者
- **/
+ * 笔记收藏、取消收藏 MQ 消费者
+ */
 @Component
 @RocketMQMessageListener(consumerGroup = "xiaohashu_group_" + MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, // Group 组
         topic = MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, // 消费的主题 Topic

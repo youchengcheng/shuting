@@ -24,11 +24,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * @author: 犬小哈
- * @date: 2024/6/4 16:41
- * @version: v1.0.0
- * @description: 推送角色权限数据到 Redis 中
- **/
+ * 推送角色权限数据到 Redis 中
+ */
 @Component
 @Slf4j
 public class PushRolePermissions2RedisRunner implements ApplicationRunner {

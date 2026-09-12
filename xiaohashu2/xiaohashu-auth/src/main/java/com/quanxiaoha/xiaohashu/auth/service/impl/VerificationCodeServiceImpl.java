@@ -17,11 +17,8 @@ import org.springframework.stereotype.Service;
 import java.util.concurrent.TimeUnit;
 
 /**
- * @author: 犬小哈
- * @date: 2024/4/7 15:41
- * @version: v1.0.0
- * @description: TODO
- **/
+ * TODO
+ */
 @Service
 @Slf4j
 public class VerificationCodeServiceImpl implements VerificationCodeService {

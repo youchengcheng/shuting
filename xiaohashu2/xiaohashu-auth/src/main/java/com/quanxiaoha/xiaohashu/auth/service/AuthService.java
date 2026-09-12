@@ -5,11 +5,8 @@ import com.quanxiaoha.xiaohashu.auth.model.vo.user.UpdatePasswordReqVO;
 import com.quanxiaoha.xiaohashu.auth.model.vo.user.UserLoginReqVO;
 
 /**
- * @author: 犬小哈
- * @date: 2024/4/7 15:41
- * @version: v1.0.0
- * @description: TODO
- **/
+ * TODO
+ */
 public interface AuthService {
 
     /**

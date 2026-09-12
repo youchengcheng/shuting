@@ -13,11 +13,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.awt.*;
 
 /**
- * @author: 犬小哈
- * @date: 2024/4/13 22:56
- * @version: v1.0.0
- * @description: TODO
- **/
+ * TODO
+ */
 @FeignClient(name = ApiConstants.SERVICE_NAME,configuration = FeignFormConfig.class)//调用的服务名称
 public interface FileFeignApi {
 

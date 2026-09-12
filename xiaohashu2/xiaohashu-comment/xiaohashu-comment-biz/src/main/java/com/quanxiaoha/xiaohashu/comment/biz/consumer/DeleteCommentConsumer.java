@@ -27,11 +27,8 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * @author: 犬小哈
- * @url: www.quanxiaoha.com
- * @date: 2024/8/30 11:27
- * @description: 删除评论 - 后续业务处理
- **/
+ * 删除评论 - 后续业务处理
+ */
 @Component
 @Slf4j
 @RocketMQMessageListener(consumerGroup = "xiaohashu_group_" + MQConstants.TOPIC_DELETE_COMMENT, // Group

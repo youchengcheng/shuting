@@ -96,6 +96,11 @@
             <artifactId>xiaohashu-user-api</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.quanxiaoha</groupId>
+            <artifactId>xiaohashu-user-relation-api</artifactId>
+        </dependency>
+
         <!-- Rocket MQ -->
         <dependency>
             <groupId>org.apache.rocketmq</groupId>

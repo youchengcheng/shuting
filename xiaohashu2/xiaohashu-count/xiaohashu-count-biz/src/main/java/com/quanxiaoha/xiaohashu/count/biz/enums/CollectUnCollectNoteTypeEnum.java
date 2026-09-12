@@ -6,11 +6,8 @@ import lombok.Getter;
 import java.util.Objects;
 
 /**
- * @author: 犬小哈
- * @url: www.quanxiaoha.com
- * @date: 2023-08-15 10:33
- * @description: 笔记收藏、取消收藏 Type
- **/
+ * 笔记收藏、取消收藏 Type
+ */
 @Getter
 @AllArgsConstructor
 public enum CollectUnCollectNoteTypeEnum {
