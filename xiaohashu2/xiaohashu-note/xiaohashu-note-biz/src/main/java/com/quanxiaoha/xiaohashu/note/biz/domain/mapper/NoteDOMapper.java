@@ -76,5 +76,6 @@ public interface NoteDOMapper {
      * 查询个人主页已发布笔记列表
      */
     List<NoteDO> selectPublishedNoteListByUserIdAndCursor(@Param("creatorId") Long creatorId,
-                                                          @Param("cursor") Long cursor);
+                                                          @Param("cursor") Long cursor,
+                                                          @Param("currentUserId") Long currentUserId);
 }

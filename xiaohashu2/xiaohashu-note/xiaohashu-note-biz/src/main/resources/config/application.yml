@@ -15,8 +15,8 @@ spring:
       client:
         config:
           xiaohashu-user-relation:
-            connectTimeout: 1000 # 连接超时（毫秒）
-            readTimeout: 2000 # 读超时（毫秒）
+            connectTimeout: 3000 # 连接超时（毫秒）
+            readTimeout: 3000 # 读超时（毫秒）
 
 mybatis:
   mapper-locations: classpath:/mapper/**/*.xml

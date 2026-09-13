@@ -17,6 +17,30 @@
           <h2 class="login-title">手机号登录</h2>
           <p class="login-note">新用户可直接登录</p>
 
+          <!-- 登录方式切换 -->
+          <div class="login-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              class="login-tab"
+              :class="{ 'login-tab--active': loginMode === 'code' }"
+              :aria-selected="loginMode === 'code' ? 'true' : 'false'"
+              @click="switchMode('code')"
+            >
+              验证码登录
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="login-tab"
+              :class="{ 'login-tab--active': loginMode === 'password' }"
+              :aria-selected="loginMode === 'password' ? 'true' : 'false'"
+              @click="switchMode('password')"
+            >
+              密码登录
+            </button>
+          </div>
+
           <!-- 手机号输入 -->
           <div class="login-field">
             <div class="login-prefix">
@@ -35,8 +59,9 @@
           </div>
 
           <!-- 验证码输入 -->
-          <div class="login-field">
+          <div v-if="loginMode === 'code'" class="login-field">
             <input
+              ref="codeInputRef"
               type="text"
               inputmode="numeric"
               placeholder="输入验证码"
@@ -53,6 +78,43 @@
               :disabled="!isPhoneValid || countdown > 0"
             >
               {{ countdown > 0 ? `重新发送(${countdown}s)` : '获取验证码' }}
+            </button>
+          </div>
+
+          <!-- 密码输入 -->
+          <div v-else class="login-field">
+            <input
+              ref="passwordInputRef"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="输入密码"
+              class="login-input login-input--password"
+              v-model="password"
+              autocomplete="current-password"
+            />
+            <button
+              type="button"
+              class="login-eye-btn"
+              :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+              @click="showPassword = !showPassword"
+            >
+              <svg v-if="showPassword" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 3l18 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                <path
+                  d="M10.6 5.3A9.6 9.6 0 0 1 12 5.2c5 0 9 4.1 9 6.8 0 1-.6 2.2-1.6 3.3M6.3 6.9C4 8.5 3 10.8 3 12c0 2.7 4 6.8 9 6.8 1.6 0 3-.4 4.3-1.1"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                />
+                <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M12 5.2c5 0 9 4.1 9 6.8s-4 6.8-9 6.8-9-4.1-9-6.8 4-6.8 9-6.8Z"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                />
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7" />
+              </svg>
             </button>
           </div>
 
@@ -83,16 +145,20 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onUnmounted } from 'vue'
 import gsap from 'gsap'
 import { message } from '@/utils/message'
 import BrandLogo from '@/components/common/BrandLogo.vue'
 import TermsConfirmModal from './TermsConfirmModal.vue'
-import { login, getVerificationCode } from '@/api/auth'
+import { login, loginByPassword, getVerificationCode } from '@/api/auth'
 import { getUserProfile } from '@/api/user'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
+
+// 密码登录失败的错误码：手机号未注册 / 手机号或密码错误
+const USER_NOT_FOUND_CODE = 'AUTH-20003'
+const PHONE_OR_PASSWORD_ERROR_CODE = 'AUTH-20004'
 
 const props = defineProps({
   visible: {
@@ -106,7 +172,14 @@ const emit = defineEmits(['update:visible'])
 const phone = ref('')
 const formattedPhone = ref('')
 const code = ref('')
+const password = ref('')
+const showPassword = ref(false)
 const agreeTerms = ref(false)
+
+// 登录方式：code - 验证码登录，password - 密码登录
+const loginMode = ref('code')
+const codeInputRef = ref(null)
+const passwordInputRef = ref(null)
 
 const modalRef = ref(null)
 
@@ -166,6 +239,30 @@ onUnmounted(() => {
   }
 })
 
+// 切换登录方式：保留手机号与协议勾选，清空已输入的验证码/密码并重置倒计时
+const switchMode = (mode) => {
+  if (loginMode.value === mode) return
+
+  loginMode.value = mode
+  code.value = ''
+  password.value = ''
+  showPassword.value = false
+
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+  countdown.value = 0
+
+  nextTick(() => {
+    if (mode === 'code') {
+      codeInputRef.value?.focus()
+    } else {
+      passwordInputRef.value?.focus()
+    }
+  })
+}
+
 // 处理登录
 const handleLogin = () => {
   if (!agreeTerms.value) {
@@ -182,38 +279,67 @@ const handleConfirmTerms = () => {
   doLogin()
 }
 
+// 登录成功后的公共处理：存储 token、拉取用户资料、关闭弹窗
+const handleLoginSuccess = (token) => {
+  // 存储 token
+  userStore.setToken(token)
+
+  // 获取用户基本信息
+  getUserProfile().then(res => {
+    if (res.success) {
+      userStore.setProfile(res.data)
+    }
+  })
+
+  message.show('登录成功')
+  onClose() // 关闭登录框
+}
+
 // 执行登录
 const doLogin = () => {
   if (!isPhoneValid.value) {
     message.show('请输入正确的手机号')
     return
   }
-  
-  if (!code.value || code.value.length !== 6) {
-    message.show('请输入正确的验证码')
-    return
-  }
-  
-  // 调用登录接口
-  login({phone: phone.value, code: code.value, type: 1}).then(res => {
-    console.log(res)
-    if (!res.success) {
-      message.show('验证码错误')
+
+  // 验证码登录
+  if (loginMode.value === 'code') {
+    if (!code.value || code.value.length !== 6) {
+      message.show('请输入正确的验证码')
       return
     }
 
-    // 存储 token
-    userStore.setToken(res.data)
-
-    // 获取用户基本信息
-    getUserProfile().then(res => {
-      if (res.success) {
-        userStore.setProfile(res.data)
+    login({phone: phone.value, code: code.value, type: 1}).then(res => {
+      if (!res.success) {
+        message.show(res.message || '验证码错误')
+        return
       }
+
+      handleLoginSuccess(res.data)
     })
-    
-    message.show('登录成功')
-    onClose() // 关闭登录框
+    return
+  }
+
+  // 密码登录
+  if (!password.value) {
+    message.show('请输入密码')
+    return
+  }
+
+  loginByPassword(phone.value, password.value).then(res => {
+    if (!res.success) {
+      // 手机号未注册或未设置过密码时，引导用户改用验证码登录
+      if (res.errorCode === USER_NOT_FOUND_CODE || res.errorCode === PHONE_OR_PASSWORD_ERROR_CODE) {
+        message.show('手机号或密码错误，未设置密码请使用验证码登录')
+        switchMode('code')
+        return
+      }
+
+      message.show(res.message || '登录失败')
+      return
+    }
+
+    handleLoginSuccess(res.data)
   })
 }
 
@@ -358,9 +484,48 @@ const formatCode = (event) => {
 }
 
 .login-note {
-  margin: 6px 0 28px;
+  margin: 6px 0 20px;
   font-size: 13px;
   color: var(--color-ink-faint);
+}
+
+.login-tabs {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.login-tab {
+  position: relative;
+  padding: 0 0 12px;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.login-tab:hover {
+  color: var(--color-ink-soft);
+}
+
+.login-tab--active {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.login-tab--active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink);
 }
 
 .login-field {
@@ -419,6 +584,10 @@ const formatCode = (event) => {
   letter-spacing: 0.18em;
 }
 
+.login-input--password {
+  letter-spacing: 0.02em;
+}
+
 .login-code-btn {
   flex-shrink: 0;
   padding: 0;
@@ -428,6 +597,30 @@ const formatCode = (event) => {
   font-weight: 500;
   cursor: pointer;
   transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.login-eye-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.login-eye-btn:hover {
+  color: var(--color-ink);
+}
+
+.login-eye-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 .login-submit {

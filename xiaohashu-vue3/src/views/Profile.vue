@@ -1,5 +1,11 @@
 <template>
   <div class="profile-page">
+    <!-- 背景图：仅当用户设置过背景图时渲染，自上而下逐渐透明 -->
+    <div v-if="profile.backgroundImg" class="profile-bg" aria-hidden="true">
+      <div class="profile-bg__layer" :style="{ backgroundImage: `url(${profile.backgroundImg})` }"></div>
+      <div class="profile-bg__fade"></div>
+    </div>
+
     <!-- 个人资料头部：对照小红书资料页，无卡片边框、整体居中 -->
     <header class="profile-header">
       <div class="profile-avatar">
@@ -115,12 +121,17 @@
     <!-- 笔记列表：笔记 / 收藏 / 点赞 共用一个瀑布流 -->
     <div class="profile-notes">
       <NoteWaterfall
-        :notes="notes"
+        :notes="displayNotes"
         :loading="loading"
         :loading-more="loadingMore"
         :has-more="hasMore"
+        :owner-actions="activeTab === 'notes' && isSelf"
         @note-click="onNoteClick"
         @load-more="loadMoreNotes"
+        @edit="handleNoteEdit"
+        @top="handleNoteTop"
+        @visible="handleNoteVisible"
+        @delete="handleNoteDelete"
       />
       <EmptyState
         v-if="!loading && notes.length === 0"
@@ -134,6 +145,33 @@
       v-model:visible="showEditModal" 
       :avatar="profile.avatar"
       @update-success="handleProfileUpdated"
+    />
+
+    <!-- 编辑笔记：复用发布弹窗的编辑模式 -->
+    <PublishModal
+      v-model:visible="showEditNoteModal"
+      :edit-note="editingNote"
+      @success="onEditNoteSuccess"
+    />
+
+    <!-- 删除笔记二次确认 -->
+    <ConfirmDialog
+      v-model:visible="showDeleteDialog"
+      title="删除笔记"
+      message="删除后该笔记将无法恢复，确定删除吗？"
+      confirm-text="删除"
+      danger
+      :loading="deleteLoading"
+      @confirm="confirmDeleteNote"
+    />
+
+    <!-- 设为仅自己可见二次确认 -->
+    <ConfirmDialog
+      v-model:visible="showPrivateDialog"
+      title="设为仅自己可见"
+      message="设为仅自己可见后，该笔记仅你本人可见，确定设置吗？"
+      :loading="privateLoading"
+      @confirm="confirmPrivateNote"
     />
 
     <!-- 笔记详情浮层：以子路由渲染，关闭时只卸载浮层，当前主页不会重新加载 -->
@@ -153,9 +191,18 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import { useUserStore } from '@/stores/user'
 import { getUserProfile } from '@/api/user'
 import EditProfileModal from '@/components/profile/EditProfileModal.vue'
-import { getPublishedNoteList, getProfileNotePageList } from '@/api/note'
+import {
+  getPublishedNoteList,
+  getProfileNotePageList,
+  getNoteDetail,
+  deleteNote,
+  topNote,
+  updateNoteVisible
+} from '@/api/note'
+import PublishModal from '@/components/note/PublishModal.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { useRoute, useRouter } from 'vue-router'
-import { followUser, unfollowUser } from '@/api/relation'
+import { followUser, unfollowUser, isFollowedUser } from '@/api/relation'
 import { message } from '@/utils/message'
 
 const userStore = useUserStore()
@@ -235,11 +282,12 @@ const handleClickOutside = (event) => {
 const profile = ref({})
 const isFollowing = ref(false)
 
-// Tab 导航配置：与小红书一致（笔记 / 收藏 / 点赞）；“笔记”数量使用后端返回的真实数据
+// Tab 导航配置：与小红书一致（笔记 / 点赞 / 收藏）；“笔记”数量使用后端返回的真实数据
+// 图标语义：like 为心形（点赞）、collect 为星形（收藏）
 const tabList = computed(() => [
   { key: 'notes', label: '笔记', icon: 'note', count: profile.value.noteTotal },
-  { key: 'like', label: '点赞', icon: 'collect' },
-  { key: 'collect', label: '收藏', icon: 'like' }
+  { key: 'like', label: '点赞', icon: 'like' },
+  { key: 'collect', label: '收藏', icon: 'collect' }
 ])
 
 // 当前 tab 对应的空态文案
@@ -334,7 +382,7 @@ const loadNotes = (isFirstPage = true) => {
 
   // 赞过（type=2）、收藏（type=3）使用页码分页接口；未登录时“笔记”tab 使用 type=1
   const type = activeTab.value === 'notes' ? 1 :
-               activeTab.value === 'collect' ? 2 : 3
+               activeTab.value === 'like' ? 2 : 3
   getProfileNotePageList(type, userId, currPageNo.value).then(res => {
     if (requestSeq !== loadSeq) return
     if (res.success) {
@@ -386,16 +434,204 @@ watch(activeTab, () => {
   loadNotes(true)
 })
 
+
+// ── 笔记操作菜单（仅本人主页的「笔记」tab）─────────────────────────
+const showEditNoteModal = ref(false)
+const editingNote = ref(null)
+const showDeleteDialog = ref(false)
+const pendingDeleteNote = ref(null)
+const deleteLoading = ref(false)
+const showPrivateDialog = ref(false)
+const pendingPrivateNote = ref(null)
+const privateLoading = ref(false)
+
+// 当前主页是否属于登录用户本人
+const isSelf = computed(() => {
+  if (!userStore.token) return false
+  const selfId = userStore.profile?.userId
+  const pageId = profile.value?.userId
+  if (selfId === undefined || selfId === null || pageId === undefined || pageId === null) return false
+  return String(selfId) === String(pageId)
+})
+
+// 渲染顺序：置顶笔记排最前，其余保持后端顺序
+// 不改动 notes 原始数组，避免影响游标分页
+const displayNotes = computed(() => {
+  const list = notes.value
+  if (!list.some((note) => note?.isTop === true)) return list
+  const top = []
+  const rest = []
+  list.forEach((note) => {
+    if (note?.isTop === true) top.push(note)
+    else rest.push(note)
+  })
+  return [...top, ...rest]
+})
+
+const noteIdOf = (note) => note?.id ?? note?.noteId
+
+// 用新字段替换列表中对应笔记，触发视图刷新（角标 / 顺序）
+const patchNote = (noteId, patch) => {
+  notes.value = notes.value.map((note) =>
+    noteIdOf(note) === noteId ? { ...note, ...patch } : note
+  )
+}
+
+// 编辑笔记：先拉全量详情，再打开弹窗的编辑模式
+const handleNoteEdit = (note) => {
+  const noteId = noteIdOf(note)
+  if (!noteId) return
+
+  getNoteDetail(noteId).then((res) => {
+    if (!res.success) {
+      message.show(res.message || '获取笔记详情失败')
+      return
+    }
+    editingNote.value = { ...res.data, id: res.data?.id ?? noteId }
+    showEditNoteModal.value = true
+  }).catch(() => {
+    message.show('获取笔记详情失败')
+  })
+}
+
+// 编辑成功：刷新列表（弹窗已给出「修改成功」提示）
+const onEditNoteSuccess = () => {
+  loadNotes(true)
+}
+
+// 删除笔记
+const handleNoteDelete = (note) => {
+  pendingDeleteNote.value = note
+  showDeleteDialog.value = true
+}
+
+const confirmDeleteNote = () => {
+  const noteId = noteIdOf(pendingDeleteNote.value)
+  if (!noteId || deleteLoading.value) return
+
+  deleteLoading.value = true
+  deleteNote(noteId).then((res) => {
+    if (res.success) {
+      notes.value = notes.value.filter((note) => noteIdOf(note) !== noteId)
+      profile.value = {
+        ...profile.value,
+        noteTotal: Math.max(0, Number(profile.value.noteTotal || 0) - 1)
+      }
+      message.show('笔记已删除')
+      showDeleteDialog.value = false
+      pendingDeleteNote.value = null
+    } else {
+      message.show(res.message || '删除失败')
+    }
+  }).catch(() => {
+    message.show('删除失败')
+  }).finally(() => {
+    deleteLoading.value = false
+  })
+}
+
+// 置顶 / 取消置顶：无二次确认
+const handleNoteTop = (note) => {
+  const noteId = noteIdOf(note)
+  if (!noteId) return
+
+  const nextTop = note.isTop !== true
+  topNote(noteId, nextTop).then((res) => {
+    if (res.success) {
+      patchNote(noteId, { isTop: nextTop })
+      message.show(nextTop ? '已置顶' : '已取消置顶')
+    } else {
+      message.show(res.message || '操作失败')
+    }
+  }).catch(() => {
+    message.show('操作失败')
+  })
+}
+
+// 可见性：设为仅自己可见需二次确认，切回公开直接执行
+const handleNoteVisible = (note) => {
+  const noteId = noteIdOf(note)
+  if (!noteId) return
+
+  if (Number(note.visible) === 1) {
+    updateNoteVisible(noteId, 0).then((res) => {
+      if (res.success) {
+        patchNote(noteId, { visible: 0 })
+        message.show('已设为公开')
+      } else {
+        message.show(res.message || '操作失败')
+      }
+    }).catch(() => {
+      message.show('操作失败')
+    })
+    return
+  }
+
+  pendingPrivateNote.value = note
+  showPrivateDialog.value = true
+}
+
+const confirmPrivateNote = () => {
+  const noteId = noteIdOf(pendingPrivateNote.value)
+  if (!noteId || privateLoading.value) return
+
+  privateLoading.value = true
+  updateNoteVisible(noteId, 1).then((res) => {
+    if (res.success) {
+      patchNote(noteId, { visible: 1 })
+      message.show('已设为仅自己可见')
+      showPrivateDialog.value = false
+      pendingPrivateNote.value = null
+    } else {
+      message.show(res.message || '操作失败')
+    }
+  }).catch(() => {
+    message.show('操作失败')
+  }).finally(() => {
+    privateLoading.value = false
+  })
+}
+
+// 编辑弹窗关闭后清掉编辑对象，避免下次打开残留旧数据
+watch(showEditNoteModal, (visible) => {
+  if (!visible) editingNote.value = null
+})
+
+// 刷新是否已关注：接口按登录用户与目标用户实时查询，未登录或看自己主页时保持未关注
+const refreshFollowStatus = (userId) => {
+  const targetId = userId ?? profile.value.userId
+  const selfId = userStore.profile?.userId
+
+  if (!targetId || !userStore.token || (selfId !== undefined && String(selfId) === String(targetId))) {
+    isFollowing.value = false
+    return
+  }
+
+  isFollowedUser(targetId).then(res => {
+    if (res.success) {
+      isFollowing.value = Boolean(res.data)
+    }
+  }).catch(() => {
+    // 关注状态获取失败时静默处理，不打断页面展示
+  })
+}
+
 // 处理个人资料更新成功的回调
 const handleProfileUpdated = (updatedProfile) => {
   // 更新本地的 profile 数据
-  profile.value = { ...profile.value, ...updatedProfile }
+  // 上传中的文件对象不是可渲染的 URL，跳过并交给下面的资料刷新补齐；
+  // 移除背景图时为 null，需要保留以便背景层立即消失
+  const { avatar, backgroundImg, removeBackgroundImg, ...rest } = updatedProfile || {}
+  const localPatch = { ...rest }
+  if (typeof avatar === 'string') localPatch.avatar = avatar
+  if (typeof backgroundImg === 'string' || backgroundImg === null) localPatch.backgroundImg = backgroundImg
+  profile.value = { ...profile.value, ...localPatch }
 
   // 可能需要重新获取用户资料以确保数据同步
   getUserProfile(route.params.userId).then(res => {
     if (res.success) {
       profile.value = res.data
-      isFollowing.value = Boolean(res.data?.isFollowing)
+      refreshFollowStatus(res.data?.userId)
     }
   })
 }
@@ -442,7 +678,7 @@ watch(() => route.params.userId, (newUserId, oldUserId) => {
   getUserProfile(newUserId).then(res => {
     if (res.success) {
       profile.value = res.data
-      isFollowing.value = Boolean(res.data?.isFollowing)
+      refreshFollowStatus(res.data?.userId)
     }
   }).catch(() => {
   }).finally(() => {
@@ -456,12 +692,43 @@ watch(() => route.params.userId, (newUserId, oldUserId) => {
 
 <style scoped>
 .profile-page {
+  position: relative;
   display: flex;
   flex-direction: column;
 }
 
+/* 背景图层：内嵌圆角卡片，绝对定位在资料头部区域，不参与交互 */
+.profile-bg {
+  position: absolute;
+  top: 16px;
+  left: 24px;
+  right: 24px;
+  height: 240px;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.profile-bg__layer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.9) 0%, rgb(0 0 0 / 0) 100%);
+  mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.9) 0%, rgb(0 0 0 / 0) 100%);
+}
+
+.profile-bg__fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgb(255 255 255 / 0) 55%, var(--color-canvas) 100%);
+}
+
 /* 资料头部：头像在左、信息在右，整体居中且无卡片边框（贴近小红书资料页） */
 .profile-header {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;

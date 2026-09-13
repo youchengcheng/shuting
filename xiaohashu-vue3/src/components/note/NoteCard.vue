@@ -1,13 +1,14 @@
 <template>
   <article
+    ref="rootRef"
     class="note-card"
-    :class="{ 'note-card--liked': isLiked }"
+    :class="{ 'note-card--liked': isLiked, 'note-card--menu-open': menuOpen }"
     role="button"
     tabindex="0"
     :aria-label="note.title || '查看笔记'"
-    @click="$emit('click', note)"
-    @keydown.enter.prevent="$emit('click', note)"
-    @keydown.space.prevent="$emit('click', note)"
+    @click="onCardClick"
+    @keydown.enter="onCardKeydown"
+    @keydown.space="onCardKeydown"
   >
     <div class="note-card__media" :class="{ 'note-card__media--empty': mediaKind === 'empty' }">
       <img
@@ -42,11 +43,60 @@
         </svg>
       </span>
 
-      <span v-if="mediaKind === 'video'" class="note-card__play" aria-hidden="true">
+      <span
+        v-if="mediaKind === 'video'"
+        class="note-card__play"
+        :class="{ 'note-card__play--shifted': ownerActions }"
+        aria-hidden="true"
+      >
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M8 5v14l11-7z" />
         </svg>
       </span>
+
+      <!-- 置顶 / 仅自己可见角标 -->
+      <div v-if="badges.length" class="note-card__badges">
+        <span v-for="badge in badges" :key="badge" class="note-card__badge">{{ badge }}</span>
+      </div>
+    </div>
+
+    <!-- 作者的「…」操作菜单：仅在自己的个人主页「笔记」tab 开启 -->
+    <div v-if="ownerActions" class="note-card__owner" @click.stop>
+      <button
+        type="button"
+        class="note-card__more"
+        :aria-expanded="menuOpen ? 'true' : 'false'"
+        aria-label="更多操作"
+        @click="toggleMenu"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="5" cy="12" r="1.6" />
+          <circle cx="12" cy="12" r="1.6" />
+          <circle cx="19" cy="12" r="1.6" />
+        </svg>
+      </button>
+
+      <Transition name="note-menu">
+        <div v-if="menuOpen" class="note-card__menu" role="menu">
+          <button type="button" class="note-card__menu-item" role="menuitem" @click="onMenuAction('top')">
+            {{ isTop ? '取消置顶' : '置顶' }}
+          </button>
+          <button type="button" class="note-card__menu-item" role="menuitem" @click="onMenuAction('visible')">
+            {{ isPrivate ? '设为公开' : '设为仅自己可见' }}
+          </button>
+          <button type="button" class="note-card__menu-item" role="menuitem" @click="onMenuAction('edit')">
+            编辑笔记
+          </button>
+          <button
+            type="button"
+            class="note-card__menu-item note-card__menu-item--danger"
+            role="menuitem"
+            @click="onMenuAction('delete')"
+          >
+            删除笔记
+          </button>
+        </div>
+      </Transition>
     </div>
 
     <div class="note-card__body">
@@ -93,7 +143,7 @@
 </template>
 
 <script setup>
-import { computed, inject, ref, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, watch } from 'vue'
 import { likeNote, unlikeNote } from '@/api/note'
 import { message } from '@/utils/message'
 import { useUserStore } from '@/stores/user'
@@ -104,10 +154,15 @@ const props = defineProps({
   note: {
     type: Object,
     required: true
+  },
+  // 仅在本人主页的「笔记」tab 开启「…」操作菜单
+  ownerActions: {
+    type: Boolean,
+    default: false
   }
 })
 
-defineEmits(['click'])
+const emit = defineEmits(['click', 'edit', 'top', 'visible', 'delete'])
 
 // 封面 / 视频 / 占位三种形态
 // 后端存在历史数据：封面地址失效、返回 404 或跨域被拦截。
@@ -205,14 +260,94 @@ const toggleLike = () => {
       rollback()
     })
 }
+
+// 卡片状态：置顶与可见性
+// 后端旧缓存反序列化后 isTop / visible 可能为 null，一律做严格判断
+const isTop = computed(() => props.note?.isTop === true)
+const isPrivate = computed(() => Number(props.note?.visible) === 1)
+
+const badges = computed(() => {
+  const list = []
+  if (isTop.value) list.push('置顶')
+  if (isPrivate.value) list.push('仅自己可见')
+  return list
+})
+
+// 「…」操作菜单
+const rootRef = ref(null)
+const menuOpen = ref(false)
+
+const closeMenu = () => {
+  menuOpen.value = false
+}
+
+const toggleMenu = () => {
+  menuOpen.value = !menuOpen.value
+}
+
+const onMenuAction = (action) => {
+  closeMenu()
+  emit(action, props.note)
+}
+
+const onCardClick = () => {
+  closeMenu()
+  emit('click', props.note)
+}
+
+// 键盘打开卡片：只在卡片本身获得焦点时响应
+// 菜单内的按钮需要保留自己的回车/空格行为
+const onCardKeydown = (event) => {
+  if (event.target !== rootRef.value) return
+  event.preventDefault()
+  onCardClick()
+}
+
+const onDocumentClick = (event) => {
+  if (rootRef.value && !rootRef.value.contains(event.target)) closeMenu()
+}
+
+const onPageScroll = () => closeMenu()
+
+const onKeydown = (event) => {
+  if (event.key === 'Escape') closeMenu()
+}
+
+// 菜单展开时才挂全局监听：点击空白、页面滚动、Esc 都收起菜单
+watch(menuOpen, (open) => {
+  if (open) {
+    document.addEventListener('click', onDocumentClick)
+    window.addEventListener('scroll', onPageScroll, true)
+    window.addEventListener('keydown', onKeydown)
+  } else {
+    document.removeEventListener('click', onDocumentClick)
+    window.removeEventListener('scroll', onPageScroll, true)
+    window.removeEventListener('keydown', onKeydown)
+  }
+})
+
+// 列表刷新 / 删除后卡片数据被替换时收起菜单
+watch(() => props.note, closeMenu)
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocumentClick)
+  window.removeEventListener('scroll', onPageScroll, true)
+  window.removeEventListener('keydown', onKeydown)
+})
 </script>
 
 <style scoped>
 .note-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   cursor: pointer;
   background: transparent;
+}
+
+/* 菜单展开时抬升整张卡片，避免下拉被下方卡片遮住 */
+.note-card--menu-open {
+  z-index: 5;
 }
 
 .note-card:focus-visible {
@@ -291,6 +426,120 @@ const toggleLike = () => {
 .note-card__play svg {
   width: 12px;
   height: 12px;
+}
+
+/* 开启操作菜单时播放角标左移，给「…」让位 */
+.note-card__play--shifted {
+  right: 42px;
+}
+
+.note-card__badges {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: calc(100% - 56px);
+}
+
+.note-card__badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: rgb(20 17 14 / 0.42);
+  color: var(--color-paper);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.note-card__owner {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 6;
+}
+
+.note-card__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: rgb(20 17 14 / 0.42);
+  color: var(--color-paper);
+  opacity: 0.72;
+  cursor: pointer;
+  transition: opacity var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard);
+}
+
+.note-card__more:hover,
+.note-card__more[aria-expanded='true'] {
+  opacity: 1;
+  background: rgb(20 17 14 / 0.6);
+}
+
+.note-card__more svg {
+  width: 16px;
+  height: 16px;
+}
+
+.note-card__menu {
+  position: absolute;
+  right: 0;
+  top: 30px;
+  min-width: 148px;
+  padding: 6px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-paper);
+  box-shadow: var(--shadow-panel);
+}
+
+.note-card__menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--color-ink);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+}
+
+.note-card__menu-item:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.note-card__menu-item--danger {
+  color: var(--color-brand);
+}
+
+.note-card__menu-item--danger:hover {
+  color: var(--color-brand);
+  background: rgb(255 36 66 / 0.08);
+}
+
+.note-menu-enter-active,
+.note-menu-leave-active {
+  transition: opacity 120ms var(--ease-standard), transform 120ms var(--ease-standard);
+}
+
+.note-menu-enter-from,
+.note-menu-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 .note-card__body {

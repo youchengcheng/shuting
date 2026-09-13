@@ -221,6 +221,14 @@
   </update>
 
 
+  <!-- 移除背景图：选择性更新无法把字段置为 NULL，这里单独提供一条定向更新 -->
+  <update id="updateBackgroundImgToNull">
+    update t_user
+    set background_img = null,
+        update_time = now()
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+
   <select id="selectByIds" resultMap="BaseResultMap">
     select id, nickname, avatar, introduction from t_user
     where status = 0 and is_deleted = 0

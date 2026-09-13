@@ -27,6 +27,11 @@ public interface UserDOMapper {
 
     int updateByPrimaryKey(UserDO record);
 
+    /**
+     * 移除背景图（选择性更新无法将字段置为 NULL，单独提供一条定向更新）
+     */
+    int updateBackgroundImgToNull(@Param("id") Long id);
+
     /*
     * 批量查询用户信息
     * */

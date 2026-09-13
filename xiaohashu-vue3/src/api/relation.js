@@ -23,4 +23,9 @@ export function getFansList(userId, pageNo) {
     return axios.post(`${API_PREFIX}/fans/list`, {userId, pageNo})
 }
 
+// 查询当前登录用户是否已关注目标用户
+export function isFollowedUser(userId) {
+    return axios.post(`${API_PREFIX}/isFollowed`, {followUserId: userId})
+}
+
 

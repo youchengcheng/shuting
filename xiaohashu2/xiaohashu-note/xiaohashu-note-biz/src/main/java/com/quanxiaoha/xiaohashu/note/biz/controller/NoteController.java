@@ -70,6 +70,15 @@ public class NoteController {
     }
 
     /*
+    * 修改笔记可见性
+    * */
+    @PostMapping("/visible")
+    @ApiOperationLog(description = "修改笔记可见性")
+    public Response<?> updateVisible(@Validated @RequestBody UpdateNoteVisibleReqVO updateNoteVisibleReqVO){
+        return noteService.updateVisible(updateNoteVisibleReqVO);
+    }
+
+    /*
     * 笔记置顶
     * */
     @PostMapping("/top")

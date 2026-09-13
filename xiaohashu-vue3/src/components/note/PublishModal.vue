@@ -24,14 +24,14 @@
                   </svg>
                 </span>
                 <span v-else class="publish-state__spinner" aria-hidden="true"></span>
-                <p class="publish-state__text">{{ isPublishSuccess ? '发布成功' : '正在发布，请稍候…' }}</p>
+                <p class="publish-state__text">{{ isPublishSuccess ? successText : pendingText }}</p>
               </div>
             </div>
           </Transition>
 
           <!-- 顶部标题栏 - 优化间距和分割线 -->
           <div class="p-[24px] flex items-center justify-between px-8 border-b border-line/60 shrink-0">
-            <h2 class="text-[18px] font-semibold text-ink">发布笔记</h2>
+            <h2 class="text-[18px] font-semibold text-ink">{{ isEditMode ? '编辑笔记' : '发布笔记' }}</h2>
             <button 
               class="w-8 h-8 flex items-center justify-center hover:bg-canvas-sunken/80 rounded-full transition-colors"
               @click="onClose"
@@ -44,8 +44,8 @@
 
           <!-- 内容区域 - 优化内边距和间距 -->
           <div class="flex-1 overflow-auto px-8 py-6 min-h-[500px]">
-            <!-- 笔记类型选择 -->
-            <div class="mb-6 border-b border-line pb-4">
+            <!-- 笔记类型选择（编辑时锁定原类型，不提供切换） -->
+            <div v-if="!isEditMode" class="mb-6 border-b border-line pb-4">
               <div class="text-sm font-medium text-ink-soft mb-3">笔记类型</div>
               <div class="flex gap-4">
                 <button 
@@ -106,8 +106,8 @@
             <div class="flex gap-4 overflow-x-auto pb-4 -mx-1 px-1">
               <!-- 已上传图片/视频预览 -->
               <div 
-                v-for="(file, index) in files" 
-                :key="index"
+                v-for="(item, index) in mediaItems" 
+                :key="item.key"
                 class="relative w-[135px] h-[135px] rounded-card overflow-hidden bg-canvas-sunken shrink-0 border border-line"
                 :class="{
                   'opacity-50': draggedItem === index,
@@ -124,7 +124,7 @@
               >
                 <!-- 上传中状态 -->
                 <div
-                  v-if="isUploading && index >= files.length - (noteType === 'video' ? 1 : files.length)"
+                  v-if="item.kind === 'local' && item.uploading"
                   class="absolute inset-0 bg-black/30 backdrop-blur-sm flex flex-col items-center justify-center text-white"
                 >
                   <!-- 图片：spinner + 百分比 -->
@@ -133,28 +133,28 @@
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"></path>
                     </svg>
-                    <div class="text-sm">上传中 {{ uploadProgress }}%</div>
+                    <div class="text-sm">上传中 {{ item.progress }}%</div>
                   </template>
                   <!-- 视频：进度条 + 百分比 -->
                   <template v-else>
                     <div class="w-3/4 h-1.5 bg-white/30 rounded overflow-hidden">
                       <div
                         class="h-full bg-white transition-all duration-200"
-                        :style="{ width: uploadProgress + '%' }"
+                        :style="{ width: item.progress + '%' }"
                       ></div>
                     </div>
-                    <div class="text-xs mt-1.5">{{ uploadProgress }}%</div>
+                    <div class="text-xs mt-1.5">{{ item.progress }}%</div>
                   </template>
                 </div>
                 
                 <!-- 视频缩略图 -->
                 <div 
-                  v-if="isVideo && file.type.startsWith('video/')"
+                  v-if="isVideo"
                   class="w-full h-full relative cursor-zoom-in"
                   @click="previewImage(index)"
                 >
                   <video 
-                    :src="getPreviewUrl(file)" 
+                    :src="mediaUrl(item)" 
                     class="w-full h-full object-cover"
                     muted
                   ></video>
@@ -171,7 +171,7 @@
                 <!-- 图片预览 -->
                 <img 
                   v-else
-                  :src="getPreviewUrl(file)" 
+                  :src="mediaUrl(item)" 
                   class="w-full h-full object-cover cursor-zoom-in"
                   @click="previewImage(index)"
                 />
@@ -186,7 +186,7 @@
                 
                 <!-- 拖拽提示图标 - 只在图文模式下显示 -->
                 <div 
-                  v-if="!isVideo && files.length > 1"
+                  v-if="!isVideo && mediaItems.length > 1"
                   class="absolute left-2 top-2 w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center"
                 >
                   <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -205,7 +205,7 @@
 
               <!-- 上传按钮 -->
               <div 
-                v-if="(noteType === 'image' && files.length < 8) || (noteType === 'video' && files.length === 0)"
+                v-if="(noteType === 'image' && mediaItems.length < 8) || (noteType === 'video' && mediaItems.length === 0)"
                 class="w-[135px] h-[135px] rounded-card border-2 border-dashed border-line flex flex-col items-center 
                 justify-center cursor-pointer hover:border-ink-faint hover:bg-canvas-sunken transition-colors bg-canvas-sunken/50 shrink-0"
                 @click="triggerUpload"
@@ -225,14 +225,14 @@
                   </svg>
                 </div>
                 <div class="text-[13px] text-ink-faint font-medium">
-                  {{ isUploading ? '上传中...' : (noteType === 'image' ? `${files.length}/8` : '上传视频') }}
+                  {{ isUploading ? '上传中...' : (noteType === 'image' ? `${mediaItems.length}/8` : '上传视频') }}
                 </div>
               </div>
             </div>
 
             <!-- 拖拽提示 - 只在图文模式下且有多张图片时显示 -->
             <div 
-              v-if="!isVideo && files.length > 1"
+              v-if="!isVideo && mediaItems.length > 1"
               class="text-[13px] text-ink-faint mt-1 flex items-center"
             >
               <svg class="w-4 h-4 mr-1 text-ink-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -319,8 +319,8 @@
 
             <!-- 底部选项区域 -->
             <div class="space-y-2 mt-4">
-              <!-- 选择频道 -->
-              <div class="relative border-t border-line">
+              <!-- 选择频道（编辑接口不支持 channelId，编辑模式隐藏） -->
+              <div v-if="!isEditMode" class="relative border-t border-line">
                 <div 
                   class="relative py-4 px-4 mt-2 -mx-4 cursor-pointer hover:bg-canvas-sunken rounded-control flex items-center justify-between"
                   @click="showChannelSelector = !showChannelSelector"
@@ -419,7 +419,7 @@
                         ref="topicInputRef"
                         v-model="topicKeyword"
                         type="text"
-                        placeholder="添加话题，如：美食探店"
+                        :placeholder="isEditMode ? '选择已有话题' : '添加话题，如：美食探店'"
                         class="flex-1 min-w-[150px] outline-none text-[14px]"
                         @input="onTopicInput"
                         @keydown.enter.prevent="handleTopicEnter"
@@ -465,7 +465,7 @@
                       
                       <!-- 添加新话题选项 -->
                       <button
-                        v-if="topicKeyword.trim() && !isLoadingTopics && !isTopicExistsInSuggestions"
+                        v-if="!isEditMode && topicKeyword.trim() && !isLoadingTopics && !isTopicExistsInSuggestions"
                         class="w-full px-4 py-3 rounded-control text-left text-[14px] flex items-center justify-between hover:bg-canvas-sunken transition-colors"
                         @click="createNewTopic"
                       >
@@ -502,7 +502,7 @@
                 @click="handlePublish"
               >
                 <span v-if="isPublishing" class="publish-state__spinner publish-state__spinner--sm" aria-hidden="true"></span>
-                {{ isPublishing ? '发布中…' : '发布笔记' }}
+                {{ isPublishing ? (isEditMode ? '保存中…' : '发布中…') : (isEditMode ? '保存修改' : '发布笔记') }}
               </button>
             </div>
           </div>
@@ -513,7 +513,7 @@
     <!-- 图片预览组件 -->
     <ImagePreview
       v-model:visible="showImagePreview"
-      :images="files.map(file => getPreviewUrl(file))"
+      :images="mediaItems.map(mediaUrl)"
       :initial-index="currentPreviewIndex"
     />
     
@@ -541,7 +541,7 @@ import VideoPreview from '@/components/common/VideoPreview.vue'
 import { useChannelStore } from '@/stores/channel'
 import { getTopicList } from '@/api/topic'
 import { uploadFile } from '@/api/file'
-import { publishNote } from '@/api/note'
+import { publishNote, updateNote } from '@/api/note'
 import { message } from '@/utils/message'
 import { useNoteStore } from '@/stores/note'
 import { useRouter } from 'vue-router'
@@ -557,10 +557,20 @@ const props = defineProps({
   visible: {
     type: Boolean,
     default: false
+  },
+  // 传入笔记详情对象即进入编辑模式（锁定类型、隐藏频道、只能选择已有话题）
+  editNote: {
+    type: Object,
+    default: null
   }
 })
 
-const emit = defineEmits(['update:visible'])
+const emit = defineEmits(['update:visible', 'success'])
+
+const isEditMode = computed(() => Boolean(props.editNote))
+// 编辑与发布共用一套过渡浮层，仅文案不同
+const successText = computed(() => (isEditMode.value ? '修改成功' : '发布成功'))
+const pendingText = computed(() => (isEditMode.value ? '正在保存，请稍候…' : '正在发布，请稍候…'))
 
 const channelStore = useChannelStore()
 
@@ -568,9 +578,46 @@ const channelStore = useChannelStore()
 const title = ref('')
 const content = ref('')
 const tags = ref('')
-const files = ref([])
 const isVideo = ref(false)
 const fileInput = ref(null)
+
+// 媒体统一模型：远程（编辑回填）与本地（新选择）混用
+// - 远程：{ kind: 'remote', url }
+// - 本地：{ kind: 'local', file, previewUrl, uploading, progress }
+const mediaItems = ref([])
+
+let mediaKeySeed = 0
+
+const createLocalItem = (file) => ({
+  kind: 'local',
+  key: `local-${++mediaKeySeed}`,
+  file,
+  previewUrl: URL.createObjectURL(file),
+  uploading: true,
+  progress: 0
+})
+
+const createRemoteItem = (url) => ({
+  kind: 'remote',
+  key: `remote-${++mediaKeySeed}`,
+  url
+})
+
+// 取媒体展示地址：本地项用 blob 预览地址，远程项直接用后端地址
+const mediaUrl = (item) => (item.kind === 'remote' ? item.url : item.previewUrl)
+
+// 是否还有文件在上传中
+const isUploading = computed(() =>
+  mediaItems.value.some((item) => item.kind === 'local' && item.uploading)
+)
+
+// 清空媒体列表，并释放本地 blob 地址
+const releaseMedia = () => {
+  mediaItems.value.forEach((item) => {
+    if (item.kind === 'local' && item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+  })
+  mediaItems.value = []
+}
 
 // 图片预览相关状态
 const showImagePreview = ref(false)
@@ -578,18 +625,17 @@ const currentPreviewIndex = ref(0)
 const showVideoPreview = ref(false)
 const currentVideoUrl = ref('')
 
-// 获取所有图片的预览URL
-const previewUrls = computed(() => {
-  return files.value.map(file => getPreviewUrl(file))
-})
+// 获取所有媒体的预览地址
+const previewUrls = computed(() => mediaItems.value.map(mediaUrl))
 
-// 预览图片
+// 预览图片 / 视频
 const previewImage = (index) => {
-  const file = files.value[index]
-  
-  if (file.type.startsWith('video/')) {
+  const item = mediaItems.value[index]
+  if (!item) return
+
+  if (isVideo.value) {
     // 视频预览
-    currentVideoUrl.value = getPreviewUrl(file)
+    currentVideoUrl.value = mediaUrl(item)
     showVideoPreview.value = true
   } else {
     // 图片预览
@@ -614,16 +660,11 @@ const setNoteType = (type) => {
   // 更新笔记类型
   noteType.value = type
   
-  // 清空文件和URL数组
-  files.value = []
-  fileUrls.value = []
-  
+  // 清空媒体列表（释放本地预览地址）
+  releaseMedia()
+
   // 重置视频标志
   isVideo.value = type === 'video'
-  
-  // 重置上传状态
-  isUploading.value = false
-  uploadProgress.value = 0
   
   // 重置文件相关错误
   if (errors.value.files) {
@@ -631,76 +672,65 @@ const setNoteType = (type) => {
   }
 }
 
-// 文件相关状态
-const fileUrls = ref([]) // 上传后的文件URL
-const isUploading = ref(false) // 添加上传状态
-const uploadProgress = ref(0) // 添加上传进度
-
 // 处理文件选择
 const handleFileChange = async (e) => {
   const selectedFiles = Array.from(e.target.files)
   if (!selectedFiles.length) return
-  
+
   // 检查文件类型
   if (noteType.value === 'video') {
     if (!selectedFiles[0].type.startsWith('video/')) {
       message.show({ type: 'error', content: '请选择视频文件' })
+      e.target.value = ''
       return
     }
     isVideo.value = true
-    
-    // 视频模式下，清空之前的文件和URL数组，确保一致性
-    files.value = []
-    fileUrls.value = []
+
+    // 视频模式下，清空之前的媒体，确保只有一个视频
+    releaseMedia()
   } else {
     // 图片模式下，过滤出图片文件
     const imageFiles = selectedFiles.filter(file => file.type.startsWith('image/'))
     if (imageFiles.length !== selectedFiles.length) {
       message.show({ type: 'error', content: '请只选择图片文件' })
+      e.target.value = ''
       return
     }
     isVideo.value = false
   }
-  
+
   // 限制文件数量
   let filesToAdd = []
   if (noteType.value === 'video') {
-    // 视频模式下，只允许一个视频
-    if (files.value.length === 0) {
+    if (mediaItems.value.length === 0) {
       filesToAdd = [selectedFiles[0]]
     } else {
       message.show({ type: 'error', content: '只能上传一个视频' })
+      e.target.value = ''
       return
     }
   } else {
-    // 图片模式下，最多8张图片
-    const remainingSlots = 8 - files.value.length
+    const remainingSlots = 8 - mediaItems.value.length
     if (remainingSlots <= 0) {
       message.show({ type: 'error', content: '最多只能上传8张图片' })
+      e.target.value = ''
       return
     }
     filesToAdd = selectedFiles.slice(0, remainingSlots)
   }
-  
-  // 开始上传文件
-  isUploading.value = true
-  uploadProgress.value = 0
-  
+
+  // 先以本地项入列（每个文件各自展示进度），上传成功后替换为远程地址
+  const newItems = filesToAdd.map(createLocalItem)
+  mediaItems.value = [...mediaItems.value, ...newItems]
+
+  // 通过数组读取响应式对象，保证进度更新能触发视图刷新
+  const findItem = (file) => mediaItems.value.find((item) => item.kind === 'local' && item.file === file)
+
   try {
-    // 添加到本地文件列表
-    const newFiles = [...files.value, ...filesToAdd]
-    files.value = newFiles
-    
-    // 逐个上传文件
-    for (let i = 0; i < filesToAdd.length; i++) {
-      const file = filesToAdd[i]
+    for (const file of filesToAdd) {
+      const item = findItem(file)
+      if (!item) continue
 
-      // 图片按文件序号计算进度；视频单独走 onUploadProgress 真实进度
-      if (noteType.value !== 'video') {
-        uploadProgress.value = Math.round((i / filesToAdd.length) * 100)
-      }
-
-      // 上传文件
       const formData = new FormData()
       formData.append('file', file)
 
@@ -708,10 +738,10 @@ const handleFileChange = async (e) => {
       const uploadConfig = noteType.value === 'video'
         ? {
             timeout: 0,
-            onUploadProgress: (e) => {
-              if (e.lengthComputable) {
+            onUploadProgress: (ev) => {
+              if (ev.lengthComputable) {
                 // 卡 99%，待响应返回后再置 100，避免"100% 但还在等后端"的错觉
-                uploadProgress.value = Math.min(99, Math.round((e.loaded / e.total) * 100))
+                item.progress = Math.min(99, Math.round((ev.loaded / ev.total) * 100))
               }
             }
           }
@@ -720,41 +750,29 @@ const handleFileChange = async (e) => {
       const res = await uploadFile(formData, uploadConfig)
 
       if (res.success && res.data) {
-        // 保存上传后的URL
-        fileUrls.value.push(res.data)
-        // 视频模式：响应返回后再置 100%
-        if (noteType.value === 'video') {
-          uploadProgress.value = 100
+        // 上传成功：换成远程地址，进度置满
+        const index = mediaItems.value.indexOf(item)
+        if (index !== -1) {
+          if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+          mediaItems.value.splice(index, 1, createRemoteItem(res.data))
         }
       } else {
-        console.error('文件上传失败:', res.message)
-        // 从本地文件列表中移除上传失败的文件
-        const index = files.value.indexOf(file)
+        // 上传失败：从列表中移除该项
+        const index = mediaItems.value.indexOf(item)
         if (index !== -1) {
-          files.value.splice(index, 1)
+          if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+          mediaItems.value.splice(index, 1)
         }
-        message.show({ 
-          type: 'error', 
-          content: `文件 ${file.name} 上传失败: ${res.message || '未知错误'}` 
+        message.show({
+          type: 'error',
+          content: `文件 ${file.name} 上传失败: ${res.message || '未知错误'}`
         })
       }
     }
-    
-    // 上传完成
-    uploadProgress.value = 100
-    
-    // 确保两个数组长度一致
-    if (files.value.length > fileUrls.value.length) {
-      // 如果不一致，调整files数组长度与fileUrls一致
-      files.value = files.value.slice(0, fileUrls.value.length)
-    }
-    
-    console.log('上传完成，文件数量:', files.value.length, '文件URL数量:', fileUrls.value.length)
   } catch (error) {
     console.error('文件上传出错:', error)
     message.show({ type: 'error', content: '文件上传出错，请重试' })
   } finally {
-    isUploading.value = false
     // 重置文件输入框，允许重新选择相同文件
     e.target.value = ''
   }
@@ -762,21 +780,11 @@ const handleFileChange = async (e) => {
 
 // 移除文件
 const removeFile = (index) => {
-  // 同时移除本地文件和对应的URL
-  files.value.splice(index, 1)
-  fileUrls.value.splice(index, 1)
-}
-
-// 获取预览URL
-const getPreviewUrl = (file) => {
-  // 如果已经上传完成，使用上传后的URL
-  const index = files.value.indexOf(file)
-  if (index !== -1 && index < fileUrls.value.length) {
-    return fileUrls.value[index]
-  }
-  
-  // 否则使用本地URL
-  return URL.createObjectURL(file)
+  const item = mediaItems.value[index]
+  if (!item) return
+  // 本地文件需要释放 blob 预览地址
+  if (item.kind === 'local' && item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+  mediaItems.value.splice(index, 1)
 }
 
 // 监听输入并限制字数
@@ -794,7 +802,7 @@ watch(content, (newVal) => {
 
 // 修改表单验证
 const isValid = computed(() => {
-  return files.value.length > 0 && 
+  return mediaItems.value.length > 0 && 
     title.value.trim() && 
     title.value.length <= 20 &&
     content.value.length <= 1000
@@ -1005,7 +1013,7 @@ const handlePublish = async () => {
   // 重置错误状态
   errors.value = {
     title: !title.value.trim(),
-    files: files.value.length === 0,
+    files: mediaItems.value.length === 0,
     topic: Boolean(selectedChannel.value && selectedTopics.value.length === 0),
     channel: false
   }
@@ -1024,14 +1032,13 @@ const handlePublish = async () => {
   }
   
   // 检查是否所有文件都已上传完成
-  if (fileUrls.value.length !== files.value.length) {
-    console.log('文件数量不匹配:', files.value.length, fileUrls.value.length)
+  if (isUploading.value) {
     message.show({ type: 'warning', content: '文件正在上传中，请等待上传完成' })
     return
   }
-  
-  // 检查是否有文件URL
-  if (fileUrls.value.length === 0) {
+
+  // 检查是否有媒体文件
+  if (mediaItems.value.length === 0) {
     message.show({ type: 'warning', content: '请上传文件' })
     return
   }
@@ -1041,8 +1048,11 @@ const handlePublish = async () => {
   
   try {
     // 数据库当前以单个 topic_id 关联笔记，前端也只提交第一个话题。
+    const isVideoNote = noteType.value === 'video'
+    const mediaUrls = mediaItems.value.map(mediaUrl)
+
     const noteData = {
-      type: noteType.value === 'video' ? 1 : 0, // 0 图文，1视频
+      type: isVideoNote ? 1 : 0, // 0 图文，1视频
       title: title.value.trim(),
       content: content.value.trim()
     }
@@ -1050,48 +1060,62 @@ const handlePublish = async () => {
     const selectedTopic = selectedTopics.value[0]
     if (selectedTopic?.id) {
       noteData.topicId = selectedTopic.id
+    } else if (isEditMode.value) {
+      // 编辑时允许清空话题：显式传 null，后端会同步清空 topicName
+      noteData.topicId = null
     } else if (selectedTopic?.name) {
       noteData.topicName = selectedTopic.name
     }
-    if (selectedChannel.value?.id) {
+
+    // 编辑模式不提交 channelId（后端编辑接口不支持频道）
+    if (!isEditMode.value && selectedChannel.value?.id) {
       noteData.channelId = selectedChannel.value.id
     }
-    
+
     // 根据笔记类型添加不同的文件字段
-    if (noteType.value === 'video') {
-      // 视频笔记
-      noteData.videoUri = fileUrls.value[0] // 只取第一个视频URL
+    if (isVideoNote) {
+      // 视频笔记：替换视频即整体替换
+      noteData.videoUri = mediaUrls[0]
     } else {
       // 图文笔记
-      noteData.imgUris = fileUrls.value
+      noteData.imgUris = mediaUrls
     }
-    
-    console.log('发布笔记数据:', noteData)
-    
-    // 调用发布接口
+
+    // 编辑模式带上笔记 ID
+    if (isEditMode.value) {
+      noteData.id = props.editNote.id
+    }
+
     isPublishing.value = true
-    const res = await publishNote(noteData)
-    
+    const res = isEditMode.value ? await updateNote(noteData) : await publishNote(noteData)
+
     if (res.success) {
-      // 发布成功：先播放成功过渡动画，再关闭弹窗并平滑刷新信息流
+      // 成功：先播放成功过渡动画，再关闭弹窗
       isPublishing.value = false
       isPublishSuccess.value = true
-      message.show('发布成功')
+      message.show(successText.value)
       setTimeout(() => {
         isPublishSuccess.value = false
+        const wasEdit = isEditMode.value
+        const editedNoteId = noteData.id
         onClose()
-        router.push('/discover')
-        noteStore.requestDiscoverRefresh()
+        if (wasEdit) {
+          // 编辑：停留当前主页，交给父组件刷新列表
+          emit('success', { id: editedNoteId })
+        } else {
+          router.push('/discover')
+          noteStore.requestDiscoverRefresh()
+        }
       }, 750)
     } else {
-      // 发布失败
+      // 发布 / 保存失败
       isPublishing.value = false
       message.show(res.message || '未知错误')
     }
   } catch (error) {
     isPublishing.value = false
-    console.error('发布笔记出错:', error)
-    message.show('发布失败')
+    console.error(isEditMode.value ? '更新笔记出错:' : '发布笔记出错:', error)
+    message.show(isEditMode.value ? '保存失败' : '发布失败')
   }
 }
 
@@ -1103,8 +1127,7 @@ const onClose = () => {
   emit('update:visible', false)
   title.value = ''
   content.value = ''
-  files.value = []
-  fileUrls.value = [] // 清空文件URL
+  releaseMedia()
   isVideo.value = false
   noteType.value = 'image'
   isTopicInputActive.value = false
@@ -1122,6 +1145,43 @@ const onClose = () => {
   isPublishSuccess.value = false
 }
 
+// 编辑模式：用笔记详情回填表单（类型、话题、媒体）
+const fillFromEditNote = (note) => {
+  if (!note) return
+
+  releaseMedia()
+  title.value = note.title || ''
+  content.value = note.content || ''
+  isVideo.value = Number(note.type) === 1
+  noteType.value = isVideo.value ? 'video' : 'image'
+
+  // 已有话题：编辑时只能沿用 / 清空，无法新建（后端编辑接口不接受 topicName）
+  selectedTopics.value = note.topicId || note.topicName
+    ? [{ id: note.topicId ?? null, name: note.topicName || '' }]
+    : []
+  topicKeyword.value = ''
+  topicSuggestions.value = []
+  isTopicInputActive.value = false
+
+  const imgUris = Array.isArray(note.imgUris) ? note.imgUris : []
+  if (isVideo.value) {
+    mediaItems.value = note.videoUri ? [createRemoteItem(note.videoUri)] : []
+  } else {
+    mediaItems.value = imgUris.slice(0, 8).map(createRemoteItem)
+  }
+
+  // 编辑不涉及频道，清掉可能残留的选择
+  selectedChannel.value = null
+  errors.value = { title: false, files: false, topic: false, channel: false }
+}
+
+// 打开弹窗（或切换编辑对象）时回填表单
+watch([() => props.visible, () => props.editNote], ([visible, note]) => {
+  if (visible && note) {
+    fillFromEditNote(note)
+  }
+})
+
 // 分别监听每个字段，只清除对应的错误
 watch(title, () => {
   if (errors.value.title) {
@@ -1129,7 +1189,7 @@ watch(title, () => {
   }
 })
 
-watch(files, () => {
+watch(mediaItems, () => {
   if (errors.value.files) {
     errors.value.files = false
   }
@@ -1197,27 +1257,13 @@ const onDragOver = (e) => {
 // 放置处理
 const onDrop = (index) => {
   if (draggedItem.value === null) return
-  
-  // 获取拖拽的文件和URL
-  const draggedFile = files.value[draggedItem.value]
-  const draggedUrl = fileUrls.value[draggedItem.value]
-  
-  // 创建新的数组
-  const newFiles = [...files.value]
-  const newUrls = [...fileUrls.value]
-  
-  // 从原位置移除
-  newFiles.splice(draggedItem.value, 1)
-  newUrls.splice(draggedItem.value, 1)
-  
-  // 插入到新位置
-  newFiles.splice(index, 0, draggedFile)
-  newUrls.splice(index, 0, draggedUrl)
-  
-  // 更新数组
-  files.value = newFiles
-  fileUrls.value = newUrls
-  
+
+  // 按拖拽后的顺序重排媒体项
+  const list = [...mediaItems.value]
+  const [moved] = list.splice(draggedItem.value, 1)
+  list.splice(index, 0, moved)
+  mediaItems.value = list
+
   // 重置拖拽状态
   endDrag()
 }

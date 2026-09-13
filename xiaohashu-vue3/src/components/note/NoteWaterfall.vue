@@ -19,7 +19,12 @@
             v-for="note in column"
             :key="noteKey(note)"
             :note="note"
+            :owner-actions="ownerActions"
             @click="$emit('note-click', note)"
+            @edit="$emit('edit', $event)"
+            @top="$emit('top', $event)"
+            @visible="$emit('visible', $event)"
+            @delete="$emit('delete', $event)"
           />
         </div>
       </div>
@@ -74,10 +79,15 @@ const props = defineProps({
   showBottomLine: {
     type: Boolean,
     default: true
+  },
+  // 透传给卡片：是否渲染作者操作菜单
+  ownerActions: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['note-click', 'load-more'])
+const emit = defineEmits(['note-click', 'load-more', 'edit', 'top', 'visible', 'delete'])
 
 const rootRef = ref(null)
 const sentinelRef = ref(null)

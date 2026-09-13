@@ -37,6 +37,40 @@
         </div>
       </div>
 
+      <!-- 背景图 -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-ink-soft mb-2">背景图</label>
+        <div class="profile-bg-preview">
+          <img v-if="form.backgroundImg" :src="form.backgroundImg" alt="背景图预览" />
+          <span v-else class="profile-bg-preview__empty">尚未设置背景图</span>
+        </div>
+        <div class="flex items-center gap-3 mt-3">
+          <input
+            type="file"
+            ref="backgroundInput"
+            accept="image/*"
+            class="hidden"
+            @change="handleBackgroundChange"
+          />
+          <button
+            type="button"
+            class="st-btn st-btn-ghost h-9 px-4 text-[13px]"
+            @click="$refs.backgroundInput.click()"
+          >
+            {{ form.backgroundImg ? '更换背景图' : '上传背景图' }}
+          </button>
+          <button
+            v-if="form.backgroundImg"
+            type="button"
+            class="st-btn st-btn-ghost h-9 px-4 text-[13px] profile-bg-remove"
+            @click="handleBackgroundRemove"
+          >
+            移除背景图
+          </button>
+          <span class="text-xs text-ink-faint">支持 jpg/png，不超过 5MB</span>
+        </div>
+      </div>
+
       <!-- 表单 -->
       <div class="space-y-6">
         <!-- 昵称 -->
@@ -186,10 +220,16 @@ const emit = defineEmits(['update:visible', 'update-success'])
 
 const userStore = useUserStore()
 
+// 背景图文件输入框引用
+const backgroundInput = ref(null)
+
 // 表单数据
 const form = ref({
   avatar: '',
   avatarFile: null,
+  backgroundImg: '',
+  backgroundImgFile: null,
+  removeBackgroundImg: false,
   nickname: '',
   xiaohashuId: '',
   birthYear: '',
@@ -258,6 +298,9 @@ const initFormData = () => {
     form.value = {
       avatar: profile.avatar || '',
       avatarFile: null,
+      backgroundImg: profile.backgroundImg || '',
+      backgroundImgFile: null,
+      removeBackgroundImg: false,
       nickname: profile.nickname || '',
       xiaohashuId: profile.xiaohashuId || '',
       birthYear,
@@ -375,6 +418,8 @@ const handleConfirm = () => {
     const profileData = {
       userId: userStore.profile?.userId,
       avatar: form.value.avatarFile, // 如果有新上传的头像文件
+      backgroundImg: form.value.backgroundImgFile, // 如果有新上传的背景图文件
+      removeBackgroundImg: form.value.removeBackgroundImg, // 保存时移除背景图
       nickname: form.value.nickname,
       xiaohashuId: form.value.xiaohashuId,
       introduction: form.value.introduction,
@@ -415,6 +460,47 @@ const handleConfirm = () => {
   }
 }
 
+// 处理背景图上传
+const handleBackgroundChange = (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  // 验证文件类型
+  if (!file.type.startsWith('image/')) {
+    message.show('请上传图片文件')
+    return
+  }
+
+  // 验证文件大小（限制为 5MB）
+  if (file.size > 5 * 1024 * 1024) {
+    message.show('图片大小不能超过 5MB')
+    return
+  }
+
+  // 存储文件对象
+  form.value.backgroundImgFile = file
+  // 重新选择图片时撤销「移除」标记
+  form.value.removeBackgroundImg = false
+
+  // 创建临时 URL 用于预览
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    form.value.backgroundImg = e.target.result
+  }
+  reader.readAsDataURL(file)
+}
+
+// 处理背景图移除（保存时生效）
+const handleBackgroundRemove = () => {
+  form.value.backgroundImg = ''
+  form.value.backgroundImgFile = null
+  form.value.removeBackgroundImg = true
+  if (backgroundInput.value) {
+    backgroundInput.value.value = ''
+  }
+  message.show('保存后移除')
+}
+
 // 处理头像上传
 const handleAvatarChange = (event) => {
   const file = event.target.files[0]
@@ -445,6 +531,39 @@ const handleAvatarChange = (event) => {
 </script>
 
 <style scoped>
+/* 移除背景图按钮 */
+.profile-bg-remove {
+  color: var(--color-ink-faint);
+}
+
+.profile-bg-remove:hover {
+  color: var(--color-brand);
+}
+
+/* 背景图预览 */
+.profile-bg-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 120px;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+}
+
+.profile-bg-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-bg-preview__empty {
+  font-size: 13px;
+  color: var(--color-ink-faint);
+}
+
 /* 自定义下拉框样式 */
 select {
   appearance: none;

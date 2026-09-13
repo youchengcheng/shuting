@@ -27,6 +27,16 @@ export function updateUserProfile(data) {
   if (data.avatar && data.avatar instanceof File) {
     formData.append('avatar', data.avatar)
   }
+
+  // 如果有背景图文件，添加到表单
+  if (data.backgroundImg && data.backgroundImg instanceof File) {
+    formData.append('backgroundImg', data.backgroundImg)
+  }
+
+  // 移除背景图：后端用显式标记清空（选择性更新无法把字段置为 NULL）
+  if (data.removeBackgroundImg === true) {
+    formData.append('removeBackgroundImg', 'true')
+  }
   
   // 添加其他字段
   if (data.nickname) formData.append('nickname', data.nickname)

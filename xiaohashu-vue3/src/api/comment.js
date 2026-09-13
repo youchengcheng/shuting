@@ -28,3 +28,8 @@ export function unlikeComment(commentId) {
     return axios.post(`${API_PREFIX}/unlike`, {commentId})
 }
 
+// 删除评论
+export function deleteComment(commentId) {
+    return axios.post(`${API_PREFIX}/delete`, {commentId})
+}
+

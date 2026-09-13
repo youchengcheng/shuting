@@ -73,11 +73,13 @@
                 :total="commentTotal"
                 :has-more="hasMoreComments"
                 :more-count="moreCommentsCount"
+                :current-user-id="currentUserId"
                 @load-more="loadMoreComments"
                 @reply="onReplyClick"
                 @click-comment="focusComment"
                 @expand-replies="handleExpandReplies"
                 @like="handleCommentLike"
+                @delete="onCommentDelete"
               />
             </div>
             
@@ -290,6 +292,17 @@
               </div>
             </div>
           </div>
+
+    <!-- 删除评论二次确认 -->
+    <ConfirmDialog
+      v-model:visible="showDeleteCommentDialog"
+      title="删除评论"
+      message="删除后该评论及其回复将一并删除，确定删除吗？"
+      confirm-text="删除"
+      danger
+      :loading="deleteCommentLoading"
+      @confirm="confirmDeleteComment"
+    />
   </div>
 </template>
 
@@ -300,7 +313,8 @@ import CommentList from './CommentList.vue'
 import ImageCarousel from '@/components/common/ImageCarousel.vue'
 import VideoPlayer from '@/components/common/VideoPlayer.vue'
 import { getNoteDetail, likeNote, unlikeNote, collectNote, uncollectNote, isLikedAndCollectedData } from '@/api/note' // 获取笔记详情的API
-import { getCommentList, publishComment, getChildCommentList, likeComment, unlikeComment } from '@/api/comment'
+import { getCommentList, publishComment, getChildCommentList, likeComment, unlikeComment, deleteComment } from '@/api/comment'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { followUser, unfollowUser } from '@/api/relation'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
@@ -530,6 +544,9 @@ watch(() => props.noteId, (newNoteId) => {
     isNoteLiked.value = false
     isNoteCollected.value = false
     isFollowing.value = false
+    // 关闭删除评论确认框，避免下次打开残留
+    showDeleteCommentDialog.value = false
+    pendingDeleteComment.value = null
   }
 }, { immediate: true })
 
@@ -834,6 +851,122 @@ const handleNoteLike = () => {
       isNoteLiked.value = !isNoteLiked.value
       currNote.value.likeTotal--
     }
+  })
+}
+
+
+// 当前登录用户 ID：评论项据此判断是否展示删除按钮
+const currentUserId = computed(() => userStore.profile?.userId ?? null)
+
+// ── 删除评论 ─────────────────────────────────────────────
+const showDeleteCommentDialog = ref(false)
+const pendingDeleteComment = ref(null)
+const deleteCommentLoading = ref(false)
+// 刚删除成功的评论 ID：后端级联删除是异步的，校准刷新时需要把它们过滤掉，避免「删了又回来」
+const deletedCommentIds = new Set()
+
+// 点击评论里的「删除」：先弹二次确认
+const onCommentDelete = (comment) => {
+  if (!comment?.commentId) return
+  pendingDeleteComment.value = comment
+  showDeleteCommentDialog.value = true
+}
+
+// 从内存列表中移除被删除的评论，并按界面语义扣减计数
+const removeCommentFromList = (targetComment) => {
+  const targetId = targetComment.commentId
+  let removedCount = 0
+
+  const topIndex = comments.value.findIndex((item) => item.commentId === targetId)
+  if (topIndex !== -1) {
+    // 一级评论：连同已加载的子评论一起移除，后端会级联删除其下全部回复
+    const removed = comments.value[topIndex]
+    // 已加载的子评论数与服务端返回的子评论总数取较大值，避免计数扣少了
+    const childCount = Math.max(
+      Number(removed.childCommentTotal || 0),
+      removed.childComments?.length || 0
+    )
+    comments.value.splice(topIndex, 1)
+    removedCount = 1 + (Number.isNaN(childCount) ? 0 : childCount)
+  } else {
+    // 二级评论：从父评论的回复列表里移除
+    for (const parent of comments.value) {
+      const children = parent.childComments || []
+      const childIndex = children.findIndex((child) => child.commentId === targetId)
+      if (childIndex === -1) continue
+
+      children.splice(childIndex, 1)
+      parent.childCommentTotal = Math.max(0, Number(parent.childCommentTotal || 0) - 1)
+      if (parent.firstReplyComment?.commentId === targetId) {
+        parent.firstReplyComment = null
+      }
+      if (parent.childCommentTotal === 0) {
+        parent.childComments = []
+      }
+      removedCount = 1
+      break
+    }
+  }
+
+  if (removedCount > 0) {
+    commentTotal.value = Math.max(0, Number(commentTotal.value || 0) - removedCount)
+    if (currNote.value) {
+      currNote.value.commentTotal = Math.max(0, Number(currNote.value.commentTotal || 0) - removedCount)
+    }
+  }
+
+  return removedCount
+}
+
+// 静默重拉第一页：用服务端数据校准列表与总数
+// 后端级联删除与计数扣减是异步的，这里只降不升，避免计数被旧值顶回去
+const refreshCommentList = () => {
+  if (!currNoteId.value) return
+  getCommentList(currNoteId.value, 1).then((res) => {
+    if (!res.success) return
+    comments.value = (res.data || [])
+      .map(mapCommentItem)
+      .filter((item) => !deletedCommentIds.has(item?.commentId))
+      .map((item) => {
+        if (!item?.childComments?.length) return item
+        const children = item.childComments.filter((child) => !deletedCommentIds.has(child?.commentId))
+        return { ...item, childComments: children }
+      })
+    currCommentPageNo.value = res.pageNo
+    totalCommentPage.value = res.totalPage
+
+    const serverTotal = Number(res.totalCount ?? 0)
+    const localTotal = Number(commentTotal.value || 0)
+    const nextTotal = Math.min(serverTotal, localTotal)
+    commentTotal.value = nextTotal
+    if (currNote.value) {
+      currNote.value.commentTotal = nextTotal
+    }
+  }).catch(() => {
+    // 校准失败不影响已完成的乐观更新
+  })
+}
+
+const confirmDeleteComment = () => {
+  const comment = pendingDeleteComment.value
+  if (!comment?.commentId || deleteCommentLoading.value) return
+
+  deleteCommentLoading.value = true
+  deleteComment(comment.commentId).then((res) => {
+    if (!res.success) {
+      message.show(res.message || '删除失败')
+      return
+    }
+
+    deletedCommentIds.add(comment.commentId)
+    removeCommentFromList(comment)
+    showDeleteCommentDialog.value = false
+    pendingDeleteComment.value = null
+    refreshCommentList()
+  }).catch(() => {
+    message.show('删除失败')
+  }).finally(() => {
+    deleteCommentLoading.value = false
   })
 }
 

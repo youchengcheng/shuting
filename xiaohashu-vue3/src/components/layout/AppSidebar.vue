@@ -132,10 +132,15 @@
         <span class="nav-item__label">关于我们</span>
       </button>
 
-      <MoreMenu v-model:visible="showMoreMenu" @about="showAboutModal = true" />
+      <MoreMenu
+        v-model:visible="showMoreMenu"
+        @about="showAboutModal = true"
+        @change-password="showChangePasswordModal = true"
+      />
     </div>
 
     <AboutModal v-model:visible="showAboutModal" />
+    <ChangePasswordModal v-model:visible="showChangePasswordModal" />
   </aside>
 </template>
 
@@ -144,6 +149,7 @@ import { computed, inject, ref } from 'vue'
 import { useUserStore } from '@/stores/user'
 import MoreMenu from './MoreMenu.vue'
 import AboutModal from './AboutModal.vue'
+import ChangePasswordModal from '@/components/auth/ChangePasswordModal.vue'
 import { message } from '@/utils/message'
 import defaultAvatar from '@/assets/avatar.png'
 
@@ -154,6 +160,7 @@ const showPublishModal = inject('showPublishModal', null)
 
 const showMoreMenu = ref(false)
 const showAboutModal = ref(false)
+const showChangePasswordModal = ref(false)
 
 const isLoggedIn = computed(() => !!userStore.token)
 const profile = computed(() => userStore.profile || {})

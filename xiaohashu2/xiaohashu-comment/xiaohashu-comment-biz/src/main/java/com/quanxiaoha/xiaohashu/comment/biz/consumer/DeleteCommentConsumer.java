@@ -96,6 +96,25 @@ public class DeleteCommentConsumer implements RocketMQListener<String>  {
 
         // 一级评论及其子评论已经删除，废弃对应的子评论分页缓存
         redisTemplate.delete(RedisKeyConstants.buildChildCommentListKey(commentId));
+
+        // 从笔记评论分页 ZSET 中移除该评论，并清理其详情缓存，
+        // 避免已删除的评论残留在缓存里占位，导致评论列表返回空数据
+        redisTemplate.opsForZSet().remove(RedisKeyConstants.buildCommentListKey(noteId), commentId);
+        redisTemplate.delete(RedisKeyConstants.buildCommentDetailKey(commentId));
+
+        // 广播清理本地缓存中的该评论详情
+        rocketMQTemplate.asyncSend(MQConstants.TOPIC_DELETE_COMMENT_LOCAL_CACHE, commentId,
+                new SendCallback() {
+                    @Override
+                    public void onSuccess(SendResult sendResult) {
+                        log.debug("==> 评论本地缓存清理消息发送成功，commentId: {}", commentId);
+                    }
+
+                    @Override
+                    public void onException(Throwable throwable) {
+                        log.warn("==> 评论本地缓存清理消息发送失败，commentId: {}", commentId, throwable);
+                    }
+                });
     }
 
     /**
@@ -157,6 +176,8 @@ public class DeleteCommentConsumer implements RocketMQListener<String>  {
         // 同时使子评论分页 ZSET 失效，避免已级联删除的回复 ID 残留在缓存中
         redisTemplate.delete(RedisKeyConstants.buildChildCommentListKey(parentCommentId));
         redisTemplate.delete(RedisKeyConstants.buildCommentDetailKey(parentCommentId));
+        // 清理被删除的二级评论自身的详情缓存，避免脏数据残留
+        redisTemplate.delete(RedisKeyConstants.buildCommentDetailKey(commentId));
         rocketMQTemplate.asyncSend(MQConstants.TOPIC_DELETE_COMMENT_LOCAL_CACHE, parentCommentId,
                 new SendCallback() {
                     @Override
