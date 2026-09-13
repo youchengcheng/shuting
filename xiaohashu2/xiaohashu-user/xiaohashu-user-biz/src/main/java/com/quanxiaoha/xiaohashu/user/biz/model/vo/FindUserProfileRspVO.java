@@ -79,5 +79,10 @@ public class FindUserProfileRspVO {
      */
     private String collectTotal;
 
+    /**
+     * 背景图
+     */
+    private String backgroundImg;
+
 }
 

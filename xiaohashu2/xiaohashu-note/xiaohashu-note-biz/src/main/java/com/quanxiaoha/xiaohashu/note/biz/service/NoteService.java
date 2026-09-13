@@ -39,6 +39,11 @@ public interface NoteService {
     Response<?> visibleOnlyMe(UpdateNoteVisibleOnlyMeReqVO updateNoteVisibleOnlyMeReqVO);
 
     /*
+    * 修改笔记可见性
+    * */
+    Response<?> updateVisible(UpdateNoteVisibleReqVO updateNoteVisibleReqVO);
+
+    /*
     * 笔记置顶
     * */
     Response<?> topNote(TopNoteReqVO topNoteReqVO);

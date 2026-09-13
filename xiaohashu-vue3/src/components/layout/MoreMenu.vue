@@ -23,6 +23,9 @@
 
       <template v-if="isLoggedIn">
         <div class="more-menu__divider"></div>
+        <button type="button" class="more-menu__item" role="menuitem" @click="openChangePassword">
+          修改密码
+        </button>
         <button type="button" class="more-menu__item more-menu__item--danger" role="menuitem" @click="handleLogout">
           退出登录
         </button>
@@ -47,7 +50,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:visible', 'about'])
+const emit = defineEmits(['update:visible', 'about', 'change-password'])
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -61,6 +64,11 @@ const onClose = () => {
 const openAbout = () => {
   onClose()
   emit('about')
+}
+
+const openChangePassword = () => {
+  onClose()
+  emit('change-password')
 }
 
 const handleLogout = () => {

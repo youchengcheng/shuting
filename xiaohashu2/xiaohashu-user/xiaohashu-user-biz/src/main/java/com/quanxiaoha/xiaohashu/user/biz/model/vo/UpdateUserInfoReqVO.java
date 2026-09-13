@@ -51,4 +51,9 @@ public class UpdateUserInfoReqVO {
      * 背景图
      */
     private MultipartFile backgroundImg;
+
+    /**
+     * 是否移除背景图（为 true 且未上传新的背景图时，清空背景图）
+     */
+    private Boolean removeBackgroundImg;
 }

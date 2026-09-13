@@ -64,5 +64,15 @@ public class NoteItemRspVO {
      */
     private String likeTotal;
 
+    /**
+     * 是否置顶
+     */
+    private Boolean isTop;
+
+    /**
+     * 笔记可见性 (0：公开 1：仅自己可见)
+     */
+    private Integer visible;
+
 }
 

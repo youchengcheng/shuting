@@ -52,3 +52,23 @@ export function getPublishedNoteList(userId, cursor) {
 export function getProfileNotePageList(type, userId, pageNo) {
     return axios.post(`${API_PREFIX}/profile/note/list`, {type, userId, pageNo})
 }
+
+// 编辑笔记
+export function updateNote(note) {
+    return axios.post(`${API_PREFIX}/update`, note)
+}
+
+// 删除笔记
+export function deleteNote(id) {
+    return axios.post(`${API_PREFIX}/delete`, {id})
+}
+
+// 笔记置顶 / 取消置顶
+export function topNote(id, isTop) {
+    return axios.post(`${API_PREFIX}/top`, {id, isTop})
+}
+
+// 修改笔记可见性（0：公开 1：仅自己可见）
+export function updateNoteVisible(id, visible) {
+    return axios.post(`${API_PREFIX}/visible`, {id, visible})
+}

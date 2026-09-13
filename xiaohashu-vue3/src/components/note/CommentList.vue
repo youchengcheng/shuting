@@ -11,9 +11,11 @@
         v-for="comment in comments"
         :key="comment.commentId"
         :comment="comment"
+        :current-user-id="currentUserId"
         @reply="$emit('reply', $event)"
         @expand-replies="$emit('expand-replies', $event)"
         @like="$emit('like', $event)"
+        @delete="$emit('delete', $event)"
       />
     </div>
 
@@ -53,10 +55,15 @@ const props = defineProps({
   moreCount: {
     type: Number,
     default: 0
+  },
+  // 当前登录用户 ID：透传给评论项，用于展示删除按钮
+  currentUserId: {
+    type: [String, Number],
+    default: null
   }
 })
 
-const emit = defineEmits(['load-more', 'click-comment', 'reply', 'expand-replies', 'like'])
+const emit = defineEmits(['load-more', 'click-comment', 'reply', 'expand-replies', 'like', 'delete'])
 const commentListRef = ref(null)
 
 // 处理滚动事件

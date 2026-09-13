@@ -730,9 +730,10 @@ public class NoteServiceImpl implements NoteService {
             throw new BizException(ResponseCodeEnum.NOTE_CANT_VISIBLE_ONLY_ME);
         }
 
-        //3.删除redis中的笔记缓存
+        //3.删除redis中的笔记缓存（笔记详情 + 主页已发布笔记列表）
         String noteDetailRedisKey = RedisKeyConstants.buildNoteDetailKey(noteId);
-        redisTemplate.delete(noteDetailRedisKey);
+        String publishedNoteListRedisKey = RedisKeyConstants.buildPublishedNoteListKey(userId);
+        redisTemplate.delete(Arrays.asList(noteDetailRedisKey, publishedNoteListRedisKey));
 
         //4.同步删除本地缓存中的笔记内容
         rocketMQTemplate.syncSend(MQConstants.TOPIC_DELETE_NOTE_LOCAL_CACHE,noteId);
@@ -766,12 +767,61 @@ public class NoteServiceImpl implements NoteService {
             throw new BizException(ResponseCodeEnum.NOTE_CANT_OPERATE);
         }
 
-        //3.删除redis中的笔记缓存
+        //3.删除redis中的笔记缓存（笔记详情 + 主页已发布笔记列表）
         String noteDetailRedisKey = RedisKeyConstants.buildNoteDetailKey(noteId);
-        redisTemplate.delete(noteDetailRedisKey);
+        String publishedNoteListRedisKey = RedisKeyConstants.buildPublishedNoteListKey(creatorId);
+        redisTemplate.delete(Arrays.asList(noteDetailRedisKey, publishedNoteListRedisKey));
 
         //4.同步删除本地缓存中的笔记内容
         rocketMQTemplate.syncSend(MQConstants.TOPIC_DELETE_NOTE_LOCAL_CACHE,noteId);
+        log.info("====> MQ：删除笔记本地缓存发送成功...");
+
+        return Response.success();
+    }
+
+
+    /*
+     * 修改笔记可见性（0：公开 1：仅自己可见）
+     * */
+    @Override
+    public Response<?> updateVisible(UpdateNoteVisibleReqVO updateNoteVisibleReqVO) {
+        //1.获取笔记id、目标可见性
+        Long noteId = updateNoteVisibleReqVO.getId();
+        Integer visible = updateNoteVisibleReqVO.getVisible();
+
+        //校验可见性取值是否合法
+        Preconditions.checkArgument(Objects.equals(visible, NoteVisibleEnum.PUBLIC.getCode())
+                || Objects.equals(visible, NoteVisibleEnum.PRIVATE.getCode()), "笔记可见性参数错误");
+
+        //2.校验笔记是否存在、以及是否为当前登录用户发布
+        Long userId = LoginUserContextHolder.getUserId();
+        NoteDO selectNoteDO = noteDOMapper.selectByPrimaryKey(noteId);
+        if (Objects.isNull(selectNoteDO)) {
+            throw new BizException(ResponseCodeEnum.NOTE_NOT_FOUND);
+        }
+        if (!Objects.equals(userId, selectNoteDO.getCreatorId())) {
+            throw new BizException(ResponseCodeEnum.NOTE_CANT_OPERATE);
+        }
+
+        //3.更新笔记可见性
+        NoteDO noteDO = NoteDO.builder()
+                .id(noteId)
+                .visible(visible)
+                .updateTime(LocalDateTime.now())
+                .build();
+
+        int count = noteDOMapper.updateVisibleOnlyMe(noteDO);
+        if (count == 0) {
+            throw new BizException(ResponseCodeEnum.NOTE_CANT_VISIBLE_ONLY_ME);
+        }
+
+        //4.删除redis中的笔记缓存（笔记详情 + 主页已发布笔记列表）
+        String noteDetailRedisKey = RedisKeyConstants.buildNoteDetailKey(noteId);
+        String publishedNoteListRedisKey = RedisKeyConstants.buildPublishedNoteListKey(userId);
+        redisTemplate.delete(Arrays.asList(noteDetailRedisKey, publishedNoteListRedisKey));
+
+        //5.同步删除本地缓存中的笔记内容
+        rocketMQTemplate.syncSend(MQConstants.TOPIC_DELETE_NOTE_LOCAL_CACHE, noteId);
         log.info("====> MQ：删除笔记本地缓存发送成功...");
 
         return Response.success();
@@ -1343,7 +1393,8 @@ public class NoteServiceImpl implements NoteService {
 
 
         //2.缓存无，则查询数据库
-        List<NoteDO> noteDOS = noteDOMapper.selectPublishedNoteListByUserIdAndCursor(userId, cursor);
+        Long currUserId = LoginUserContextHolder.getUserId();
+        List<NoteDO> noteDOS = noteDOMapper.selectPublishedNoteListByUserIdAndCursor(userId, cursor, currUserId);
 
         if (CollUtil.isNotEmpty(noteDOS)) {
             // DO 转 VO
@@ -1361,6 +1412,8 @@ public class NoteServiceImpl implements NoteService {
                                 .videoUri(noteDO.getVideoUri())
                                 .title(noteDO.getTitle())
                                 .isLiked(false)
+                                .isTop(noteDO.getIsTop())
+                                .visible(noteDO.getVisible())
                                 .build();
                         return noteItemRspVO;
                     }).toList();

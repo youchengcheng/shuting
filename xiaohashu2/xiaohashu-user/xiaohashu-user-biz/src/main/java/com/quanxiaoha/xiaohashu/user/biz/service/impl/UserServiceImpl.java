@@ -203,13 +203,24 @@ public class UserServiceImpl implements UserService {
             needUpdate = true;
         }
 
-        if (needUpdate) {
+        // 是否移除背景图：上传了新背景图则以新图为准，否则按前端传入的标记清空背景图
+        boolean removeBackgroundImg = Boolean.TRUE.equals(updateUserInfoReqVO.getRemoveBackgroundImg())
+                && Objects.isNull(backgroundImgFile);
+
+        if (needUpdate || removeBackgroundImg) {
             //跟新用户元数据时先删除redis缓存中的数据----这里采用延迟双删策略
             deleteUserRedisCache(userId);
 
-            // 更新用户信息
-            userDO.setUpdateTime(LocalDateTime.now());
-            userDOMapper.updateByPrimaryKeySelective(userDO);
+            if (needUpdate) {
+                // 更新用户信息
+                userDO.setUpdateTime(LocalDateTime.now());
+                userDOMapper.updateByPrimaryKeySelective(userDO);
+            }
+
+            // 选择性更新无法把字段置为 NULL，背景图移除单独执行一条定向更新
+            if (removeBackgroundImg) {
+                userDOMapper.updateBackgroundImgToNull(userId);
+            }
 
             // 资料更新后立即失效缓存，避免 findById/关注列表继续返回旧资料。
 //            userId = userDO.getId();
@@ -566,6 +577,7 @@ public class UserServiceImpl implements UserService {
                 .xiaohashuId(userDO.getXiaohashuId())
                 .sex(userDO.getSex())
                 .introduction(userDO.getIntroduction())
+                .backgroundImg(userDO.getBackgroundImg())
                 .build();
         LocalDate birthday = userDO.getBirthday();
         findUserProfileRspVO.setAge(Objects.isNull(birthday) ? 0 : DateUtils.calculateAge(birthday));
