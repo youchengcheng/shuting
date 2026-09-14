@@ -31,4 +31,30 @@ app.use(router)
 // 应用 Pinia
 app.use(pinia)
 
-app.mount('#app')
+// 整页刷新的过渡：index.html 里的首屏加载层先于 JS 呈现，应用挂载完成后再淡出，
+// 避免刷新时白屏硬切。最短展示时长用于避免加载快时加载层一闪而过。
+const BOOT_MIN_VISIBLE = 260
+
+const dismissBootLayer = () => {
+  const bootEl = document.getElementById('boot')
+  if (!bootEl) return
+
+  // performance.now() 即导航开始至今的时长，可近似视为加载层已展示的时间
+  const elapsed = window.performance?.now?.() ?? BOOT_MIN_VISIBLE
+  const delay = Math.max(0, BOOT_MIN_VISIBLE - elapsed)
+
+  window.setTimeout(() => {
+    bootEl.classList.add('boot--done')
+
+    const removeBootLayer = () => bootEl.remove()
+    // reduced-motion 下过渡被禁用，没有 transitionend，用定时器兜底
+    bootEl.addEventListener('transitionend', removeBootLayer, { once: true })
+    window.setTimeout(removeBootLayer, 600)
+  }, delay)
+}
+
+try {
+  app.mount('#app')
+} finally {
+  dismissBootLayer()
+}

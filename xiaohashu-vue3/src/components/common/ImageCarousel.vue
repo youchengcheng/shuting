@@ -8,7 +8,7 @@
     <!-- 图片容器 -->
     <div class="h-full overflow-hidden">
       <div 
-        class="h-full flex transition-transform duration-500 ease-in-out"
+        class="h-full flex carousel-track"
         :style="{ transform: `translateX(-${currentIndex * 100}%)` }"
       >
         <div 
@@ -275,10 +275,15 @@ const handleWheel = (e) => {
   transition: width 0.3s ease-in-out;
 }
 
+/* 轮播换页：与站内其它位移动作共用同一套时长与缓动 */
+.carousel-track {
+  transition: transform 420ms var(--ease-standard);
+}
+
 /* 添加淡入淡出动画 */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity var(--motion-base) var(--ease-standard);
 }
 
 .fade-enter-from,

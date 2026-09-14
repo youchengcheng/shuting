@@ -1,12 +1,13 @@
 <template>
   <div
+    ref="overlayRef"
     class="note-overlay"
     role="dialog"
     aria-modal="true"
     aria-label="笔记详情"
-    @click.self="close"
+    @click.self="handleClose"
   >
-    <button type="button" class="note-overlay__close" aria-label="关闭" @click="close">
+    <button type="button" class="note-overlay__close" aria-label="关闭" @click="handleClose">
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
       </svg>
@@ -19,11 +20,13 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NoteDetailContent from '@/components/note/NoteDetailContent.vue'
+import { useNoteTransition } from '@/composables/noteTransition'
+import { useNoteStore } from '@/stores/note'
 
-defineProps({
+const props = defineProps({
   noteId: {
     type: [String, Number],
     default: ''
@@ -32,6 +35,10 @@ defineProps({
 
 const route = useRoute()
 const router = useRouter()
+const noteStore = useNoteStore()
+const { closeNote } = useNoteTransition()
+
+const overlayRef = ref(null)
 
 // 关闭浮层：回到打开前所在的页面（信息流 / 个人页 / 搜索页），
 // 底层页面全程保持挂载，所以返回后不会重新请求数据、也不会丢失滚动位置。
@@ -45,8 +52,16 @@ const close = () => {
   router.replace(route.path.replace(/\/note\/[^/]+$/, '') || '/discover')
 }
 
+// 关闭时封面反向收回卡片原位；过渡进行期间浮层立刻从新画面里拿掉，避免残留
+const handleClose = () => {
+  closeNote(props.noteId, () => {
+    close()
+    if (overlayRef.value) overlayRef.value.style.display = 'none'
+  })
+}
+
 const handleKeydown = (event) => {
-  if (event.key === 'Escape') close()
+  if (event.key === 'Escape') handleClose()
 }
 
 // 浮层打开期间锁定背景滚动
@@ -60,6 +75,8 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleKeydown)
   document.body.style.overflow = ''
   document.documentElement.style.overflow = ''
+  // 乐观封面只服务于本次打开，关掉浮层就清掉，避免影响下一篇
+  noteStore.setPendingHero(null)
 })
 </script>
 

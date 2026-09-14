@@ -8,8 +8,101 @@
     <meta name="theme-color" content="#ffffff">
     <meta name="description" content="书亭 · 记录与发现好内容">
     <title>书亭 · 记录与发现好内容</title>
+    <style>
+      /* 首屏加载层：整页刷新（F5 / 资料更新后的自动刷新）先于 JS 呈现，
+         避免白屏硬切；应用挂载完成后由 main.js 淡出并移除。 */
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: #ffffff;
+        transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      #boot.boot--done {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #boot .boot__mark {
+        display: block;
+        width: 44px;
+        height: 44px;
+      }
+
+      #boot .boot__word {
+        font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', system-ui, 'Segoe UI', sans-serif;
+        font-size: 17px;
+        font-weight: 600;
+        line-height: 1;
+        color: #333333;
+      }
+
+      /* 不定量进度条：与站内骨架屏的流光语言一致，只表达「正在加载」 */
+      #boot .boot__bar {
+        position: relative;
+        width: 96px;
+        height: 2px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #f0f0f0;
+      }
+
+      #boot .boot__bar::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 40%;
+        border-radius: inherit;
+        background: #ff2442;
+        animation: boot-progress 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+      }
+
+      #boot .boot__sr {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      @keyframes boot-progress {
+        from {
+          transform: translateX(-110%);
+        }
+        to {
+          transform: translateX(260%);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #boot {
+          transition: none;
+        }
+
+        #boot .boot__bar::after {
+          width: 100%;
+          opacity: 0.4;
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot" role="status" aria-live="polite">
+      <img class="boot__mark" src="/favicon.svg" alt="" width="44" height="44" />
+      <span class="boot__word">书亭</span>
+      <span class="boot__bar" aria-hidden="true"></span>
+      <span class="boot__sr">页面加载中…</span>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>

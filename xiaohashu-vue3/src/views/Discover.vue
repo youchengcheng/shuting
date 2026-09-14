@@ -48,11 +48,13 @@ import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { getDiscoverNotePageList } from '@/api/note'
 import { useNoteStore } from '@/stores/note'
 import { useRoute, useRouter } from 'vue-router'
+import { useNoteTransition } from '@/composables/noteTransition'
 
 
 const route = useRoute()
 const router = useRouter()
 const noteStore = useNoteStore()
+const { openNote } = useNoteTransition()
 
 // 笔记数据
 const notes = ref([])
@@ -156,11 +158,12 @@ const updateRouteQuery = (channelId) => {
   })
 }
 
-// 点击笔记卡片：打开详情浮层（子路由），当前信息流保持挂载
+// 点击笔记卡片：打开详情浮层（子路由），当前信息流保持挂载。
+// 展开动画由 openNote 负责：封面从卡片原位扩张到详情媒体区
 const onNoteClick = (note) => {
   const noteId = note.id ?? note.noteId
   if (!noteId) return
-  router.push({
+  openNote(note, {
     path: `${route.path}/note/${noteId}`,
     query: route.query
   })

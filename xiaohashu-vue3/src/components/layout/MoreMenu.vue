@@ -145,16 +145,21 @@ const handleLogout = () => {
   z-index: 99;
 }
 
-.dropdown-enter-active,
+.dropdown-enter-active {
+  transition:
+    opacity 180ms var(--ease-standard),
+    transform 180ms var(--ease-standard);
+}
+
 .dropdown-leave-active {
   transition:
-    opacity var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-standard);
+    opacity 120ms var(--ease-standard),
+    transform 120ms var(--ease-standard);
 }
 
 .dropdown-enter-from,
 .dropdown-leave-to {
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateY(4px) scale(0.97);
 }
 </style>

@@ -1,15 +1,10 @@
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="modal-mask" @click="onClickMask"></div>
+    <Transition name="dialog-mask">
+      <div v-if="visible" class="modal-mask" @click="onClickMask"></div>
+    </Transition>
 
-    <Transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="opacity-0 translate-y-2"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition duration-150 ease-in"
-      leave-from-class="opacity-100 translate-y-0"
-      leave-to-class="opacity-0 translate-y-2"
-    >
+    <Transition name="dialog">
       <div v-if="visible" class="modal-layer">
         <div class="modal-panel" :style="{ width: width }" role="dialog" aria-modal="true" @click.stop>
           <div class="modal-header">

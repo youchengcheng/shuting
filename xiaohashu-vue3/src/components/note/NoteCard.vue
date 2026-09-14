@@ -10,7 +10,12 @@
     @keydown.enter="onCardKeydown"
     @keydown.space="onCardKeydown"
   >
-    <div class="note-card__media" :class="{ 'note-card__media--empty': mediaKind === 'empty' }">
+    <!-- data-note-cover 供详情展开动画定位「从哪张卡片长出来」（见 composables/noteTransition.js） -->
+    <div
+      class="note-card__media"
+      :class="{ 'note-card__media--empty': mediaKind === 'empty' }"
+      :data-note-cover="note.id ?? note.noteId"
+    >
       <img
         v-if="mediaKind === 'image'"
         class="note-card__image"
@@ -531,15 +536,22 @@ onBeforeUnmount(() => {
   background: rgb(255 36 66 / 0.08);
 }
 
-.note-menu-enter-active,
+.note-menu-enter-active {
+  transition:
+    opacity 180ms var(--ease-standard),
+    transform 180ms var(--ease-standard);
+}
+
 .note-menu-leave-active {
-  transition: opacity 120ms var(--ease-standard), transform 120ms var(--ease-standard);
+  transition:
+    opacity 120ms var(--ease-standard),
+    transform 120ms var(--ease-standard);
 }
 
 .note-menu-enter-from,
 .note-menu-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-4px) scale(0.97);
 }
 
 .note-card__body {

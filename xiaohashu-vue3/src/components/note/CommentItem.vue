@@ -410,15 +410,22 @@ const handleExpandReplies = (comment) => {
   background: rgb(255 36 66 / 0.08);
 }
 
-.comment-menu-enter-active,
+.comment-menu-enter-active {
+  transition:
+    opacity 180ms var(--ease-standard),
+    transform 180ms var(--ease-standard);
+}
+
 .comment-menu-leave-active {
-  transition: opacity 120ms var(--ease-standard), transform 120ms var(--ease-standard);
+  transition:
+    opacity 120ms var(--ease-standard),
+    transform 120ms var(--ease-standard);
 }
 
 .comment-menu-enter-from,
 .comment-menu-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-4px) scale(0.97);
 }
 
 .comment-action__icon {

@@ -338,6 +338,150 @@
     }
   }
 
+  /* ---- 页面级过渡 ---------------------------------------------------------
+     整页刷新的首屏加载层（index.html 内联样式）、路由切换与页内数据刷新
+     共用同一套运动语言：位移极小、出场快于入场，只表达「内容换了」。
+     reduced-motion 由文件末尾的全局规则统一关闭。 */
+
+  /* 路由切换：BasicLayout 的 router-view（out-in） */
+  .page-swap-leave-active {
+    transition:
+      opacity 120ms var(--ease-standard),
+      transform 120ms var(--ease-standard);
+  }
+
+  .page-swap-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  .page-swap-enter-active {
+    transition:
+      opacity 200ms var(--ease-standard),
+      transform 200ms var(--ease-standard);
+  }
+
+  .page-swap-enter-from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  /* 页内数据刷新：切换关注/粉丝等 tab 时的整块淡换 */
+  .content-swap-leave-active {
+    transition:
+      opacity 110ms var(--ease-standard),
+      transform 110ms var(--ease-standard);
+  }
+
+  .content-swap-leave-to {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  .content-swap-enter-active {
+    transition:
+      opacity 180ms var(--ease-standard),
+      transform 180ms var(--ease-standard);
+  }
+
+  .content-swap-enter-from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  /* 弹层语汇：菜单 / 下拉 / 气泡（pop）、对话框（dialog）、轻提示（toast）。
+     位移与时长统一，避免同一个动作在不同位置手感不一。 */
+  .pop-enter-active {
+    transition:
+      opacity 180ms var(--ease-standard),
+      transform 180ms var(--ease-standard);
+  }
+
+  .pop-leave-active {
+    transition:
+      opacity 120ms var(--ease-standard),
+      transform 120ms var(--ease-standard);
+  }
+
+  .pop-enter-from,
+  .pop-leave-to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+
+  .dialog-enter-active {
+    transition:
+      opacity 240ms var(--ease-standard),
+      transform 240ms var(--ease-standard);
+  }
+
+  .dialog-leave-active {
+    transition:
+      opacity 160ms var(--ease-standard),
+      transform 160ms var(--ease-standard);
+  }
+
+  .dialog-enter-from,
+  .dialog-leave-to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  .dialog-mask-enter-active {
+    transition: opacity 200ms var(--ease-standard);
+  }
+
+  .dialog-mask-leave-active {
+    transition: opacity 160ms var(--ease-standard);
+  }
+
+  .dialog-mask-enter-from,
+  .dialog-mask-leave-to {
+    opacity: 0;
+  }
+
+  .toast-enter-active {
+    transition:
+      opacity 200ms var(--ease-standard),
+      transform 200ms var(--ease-standard);
+  }
+
+  .toast-leave-active {
+    transition:
+      opacity 150ms var(--ease-standard),
+      transform 150ms var(--ease-standard);
+  }
+
+  .toast-enter-from,
+  .toast-leave-to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  /* 笔记详情：封面从卡片原位扩张到媒体区（View Transitions API）。
+     html.note-vt 由 composables/noteTransition.js 控制：
+     - 媒体区在过渡期间接管 note-hero 命名
+     - 浮层自身不播淡入淡出，进出场完全交给共享元素动画 */
+  html.note-vt .note-detail__media {
+    view-transition-name: note-hero;
+  }
+
+  html.note-vt .note-overlay {
+    transition: none !important;
+  }
+
+  html.note-vt .note-overlay.note-overlay-enter-from,
+  html.note-vt .note-overlay.note-overlay-leave-to {
+    /* 快照阶段浮层必须可见，遮罩的明暗由上层 root 过渡负责 */
+    opacity: 1 !important;
+  }
+
+  html.note-vt .note-overlay__card {
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
   .page-header__desc {
     margin-top: 8px;
     font-size: 13px;
@@ -353,5 +497,39 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   笔记详情：封面从卡片原位扩张到详情媒体区（View Transitions API）
+   形变只发生在 note-hero 上，页面其余部分（遮罩 + 面板）整体淡入，
+   避免整页快照交叉淡化带来的糊化
+   -------------------------------------------------------------------------- */
+::view-transition-group(note-hero) {
+  animation-duration: 420ms;
+  animation-timing-function: var(--ease-standard);
+}
+
+::view-transition-old(note-hero),
+::view-transition-new(note-hero) {
+  animation-duration: 220ms;
+}
+
+::view-transition-old(root) {
+  animation: none;
+  opacity: 1;
+}
+
+::view-transition-new(root) {
+  animation: note-vt-veil 260ms var(--ease-standard);
+}
+
+@keyframes note-vt-veil {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
   }
 }

@@ -345,6 +345,8 @@ public class NoteServiceImpl implements NoteService {
             fillNoteCount(findNoteDetailRspVO);
             // 填充当前登录用户是否已关注作者（用户态数据，不写入缓存）
             fillFollowStatus(userId, findNoteDetailRspVO);
+            // 作者昵称/头像属于用户服务的可变数据，每次读都补齐，不吃缓存里的快照
+            fillCreatorInfo(findNoteDetailRspVO);
             return Response.success(findNoteDetailRspVO);
         }
         //再到redis中查询笔记是否存在
@@ -374,6 +376,8 @@ public class NoteServiceImpl implements NoteService {
             }
             // 填充点赞/收藏/评论计数
             fillNoteCount(findNoteDetailRspVO);
+            // 作者昵称/头像每次读都补齐
+            fillCreatorInfo(findNoteDetailRspVO);
             // 填充当前登录用户是否已关注作者（用户态数据，不写入缓存）
             fillFollowStatus(userId, findNoteDetailRspVO);
             return Response.success(findNoteDetailRspVO);
@@ -396,15 +400,7 @@ public class NoteServiceImpl implements NoteService {
         Integer visible = noteDO.getVisible();
         checkNoteVisible(visible,userId,noteDO.getCreatorId());
 
-        //优化：并异步进行RPC服务调用查询信息
-        //获取笔记发布者id
-        Long creatorId = noteDO.getCreatorId();
-        CompletableFuture<FindUserByIdRspDTO> userResultFuture = CompletableFuture
-                //RPC 调用用户服务
-                .supplyAsync(() ->
-                    rpcWithAppClassLoader(() -> userRpcService.findById(creatorId)), threadPoolTaskExecutor
-                );
-
+        // 作者昵称/头像不在这里查询，改由响应前统一补齐（见 fillCreatorInfo），避免被拍进缓存快照
         //先赋值为空，判断笔记不为空在进行异步调用K-V服务
         CompletableFuture<String> contentResultFuture = CompletableFuture.completedFuture(null);
 
@@ -416,16 +412,9 @@ public class NoteServiceImpl implements NoteService {
                     rpcWithAppClassLoader(() -> keyValueRpcService.findNoteContent(noteDO.getContentUuid())), threadPoolTaskExecutor);
         }
 
-        //因为contentResultFuture被二次赋值，已经不是final修饰了，再lambda中无法使用
-        CompletableFuture<String> finalContentResultFuture = contentResultFuture;
-        CompletableFuture<FindNoteDetailRspVO> resultFuture = CompletableFuture
-                //allOf所有的异步任务执行完再往下执行
-                .allOf(userResultFuture,contentResultFuture)
+        CompletableFuture<FindNoteDetailRspVO> resultFuture = contentResultFuture
                 //结果处理
-                .thenApply(s -> {
-                    //join获取出参
-                    FindUserByIdRspDTO findUserByIdRspDTO = userResultFuture.join();
-                    String content = finalContentResultFuture.join();
+                .thenApply(content -> {
 
                     //笔记类型
                     Integer noteType = noteDO.getType();
@@ -449,8 +438,6 @@ public class NoteServiceImpl implements NoteService {
                             .topicId(noteDO.getTopicId())
                             .topicName(noteDO.getTopicName())
                             .creatorId(noteDO.getCreatorId())
-                            .creatorName(findUserByIdRspDTO.getNickName())
-                            .avatar(findUserByIdRspDTO.getAvatar())
                             .videoUri(noteDO.getVideoUri())
                             .updateTime(noteDO.getUpdateTime())
                             .visible(noteDO.getVisible())
@@ -474,6 +461,9 @@ public class NoteServiceImpl implements NoteService {
             long expireSeconds = 60*60*24 + RandomUtil.randomInt(60*60*24);
             redisTemplate.opsForValue().set(noteDetailRedisKey,noteDetailCacheJson,expireSeconds,TimeUnit.SECONDS);
         });
+
+        // 缓存快照写完之后再补齐作者信息：用户资料是用户服务的可变数据，只进响应、不进缓存
+        fillCreatorInfo(findNoteDetailRspVO);
 
         // 填充当前登录用户是否已关注作者（用户态数据，不写入缓存）
         fillFollowStatus(userId, findNoteDetailRspVO);
@@ -1876,6 +1866,27 @@ public class NoteServiceImpl implements NoteService {
             // 关注状态属于附加信息，查询失败降级为未关注，不能影响笔记详情返回
             log.error("==> 查询当前用户是否已关注作者失败, currUserId: {}, creatorId: {}", currUserId, creatorId, e);
             findNoteDetailRspVO.setIsFollowing(Boolean.FALSE);
+        }
+    }
+
+    /*
+    * 补齐笔记作者信息（昵称、头像）
+    * 用户资料是用户服务的可变数据，只用于本次响应，不能写进缓存快照
+    * */
+    private void fillCreatorInfo(FindNoteDetailRspVO findNoteDetailRspVO) {
+        if (Objects.isNull(findNoteDetailRspVO) || Objects.isNull(findNoteDetailRspVO.getCreatorId())) {
+            return;
+        }
+        try {
+            FindUserByIdRspDTO findUserByIdRspDTO = userRpcService.findById(findNoteDetailRspVO.getCreatorId());
+            if (Objects.isNull(findUserByIdRspDTO)) {
+                return;
+            }
+            findNoteDetailRspVO.setCreatorName(findUserByIdRspDTO.getNickName());
+            findNoteDetailRspVO.setAvatar(findUserByIdRspDTO.getAvatar());
+        } catch (Exception e) {
+            // 作者信息属于附加信息，查询失败降级为空（前端展示默认头像），不能影响笔记详情返回
+            log.error("==> 查询笔记作者信息失败, creatorId: {}", findNoteDetailRspVO.getCreatorId(), e);
         }
     }
 

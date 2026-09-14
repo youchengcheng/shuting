@@ -190,9 +190,11 @@ import { searchNote, searchUser } from '@/api/search'
 import { followUser, unfollowUser } from '@/api/relation'
 import UserCard from '@/components/user/UserCard.vue'
 import { message } from '@/utils/message'
+import { useNoteTransition } from '@/composables/noteTransition'
 
 const route = useRoute()
 const router = useRouter()
+const { openNote } = useNoteTransition()
 const showLoginModal = inject('showLoginModal', null)
 const activeTab = ref('notes') // 默认选中笔记标签
 
@@ -413,11 +415,12 @@ onUnmounted(() => {
 })
 
 
-// 点击笔记卡片：打开详情浮层（子路由），当前搜索结果保持挂载
+// 点击笔记卡片：打开详情浮层（子路由），当前搜索结果保持挂载。
+// 展开动画由 openNote 负责：封面从卡片原位扩张到详情媒体区
 const onNoteClick = (note) => {
   const noteId = note.id ?? note.noteId
   if (!noteId) return
-  router.push({
+  openNote(note, {
     path: `${route.path}/note/${noteId}`,
     query: route.query
   })

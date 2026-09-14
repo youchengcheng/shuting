@@ -49,4 +49,10 @@ public interface UserService {
      * 获取用户主页信息
      */
     Response<FindUserProfileRspVO> findUserProfile(FindUserProfileReqVO findUserProfileReqVO);
+
+    /*
+    * 删除用户的本地缓存（用户信息 + 主页资料）
+    * 本地缓存在每个实例的 JVM 内，由广播消息触发各实例自行调用
+    * */
+    void deleteUserLocalCache(Long userId);
 }
