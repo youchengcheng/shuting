@@ -352,8 +352,11 @@ const months = [
   { value: '12', label: '12月' }
 ]
 
+// 更新成功到整页刷新之间的间隔（毫秒）：留出时间让“更新成功”提示可见
+const PROFILE_REFRESH_DELAY = 600
+
 // 表单验证和提交
-const handleConfirm = () => {
+const handleConfirm = async () => {
   // 验证表单
   if (!form.value.nickname.trim()) {
     message.show('请输入昵称')
@@ -432,28 +435,36 @@ const handleConfirm = () => {
     }
     
     // 调用 API 更新用户资料
-    updateUserProfile(profileData).then(res => {
-      if (!res.success) {
-        message.show(res.message || '更新失败，请重试')
-        return
+    const res = await updateUserProfile(profileData)
+    if (!res.success) {
+      message.show(res.message || '更新失败，请重试')
+      return
+    }
+
+    message.show('更新成功')
+
+    // 获取最新的用户信息并写回 store：pinia 持久化会同步到 localStorage，
+    // 保证整页刷新后头部、侧边栏等位置拿到的是最新资料
+    try {
+      const profileRes = await getUserProfile()
+      if (profileRes.success) {
+        userStore.setProfile(profileRes.data)
       }
-      
-      message.show('更新成功')
-      
-      // 获取用户基本信息
-      getUserProfile().then(res => {
-        if (res.success) {
-          userStore.setProfile(res.data)
-        }
-      })
-      
-      // 触发更新成功事件，通知父组件
-      emit('update-success', profileData)
-      
-      // 关闭模态框
-      emit('update:visible', false)
-    })
-    
+    } catch (err) {
+      console.error('刷新用户资料出错:', err)
+    }
+
+    // 触发更新成功事件，通知父组件
+    emit('update-success', profileData)
+
+    // 关闭模态框
+    emit('update:visible', false)
+
+    // 资料更新成功后整页刷新，避免页面其他位置（头部、笔记列表等）仍展示旧的用户信息
+    setTimeout(() => {
+      window.location.reload()
+    }, PROFILE_REFRESH_DELAY)
+
   } catch (error) {
     console.error('更新资料出错:', error)
     message.show('更新失败，请重试')

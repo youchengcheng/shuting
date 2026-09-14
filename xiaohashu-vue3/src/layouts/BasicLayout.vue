@@ -7,7 +7,13 @@
 
       <main class="app-main">
         <div class="app-container">
-          <router-view></router-view>
+          <!-- 页面切换：out-in 避免两个页面同时存在；不带 key，打开笔记详情浮层
+              时底层页面仍是同一个组件实例，不会被重新挂载 -->
+          <router-view v-slot="{ Component }">
+            <Transition name="page-swap" mode="out-in">
+              <component :is="Component" />
+            </Transition>
+          </router-view>
         </div>
       </main>
     </div>

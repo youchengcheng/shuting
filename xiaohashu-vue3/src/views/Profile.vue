@@ -41,14 +41,7 @@
               </button>
 
               <!-- 下拉菜单 -->
-              <Transition
-                enter-active-class="transition duration-100 ease-out"
-                enter-from-class="transform scale-95 opacity-0"
-                enter-to-class="transform scale-100 opacity-100"
-                leave-active-class="transition duration-75 ease-in"
-                leave-from-class="transform scale-100 opacity-100"
-                leave-to-class="transform scale-95 opacity-0"
-              >
+              <Transition name="pop">
                 <div 
                   v-if="showDropdown"
                   class="profile-dropdown absolute right-0 mt-2 w-[160px] bg-paper rounded-card shadow-panel p-2 z-50 border border-line"
@@ -204,10 +197,12 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { followUser, unfollowUser, isFollowedUser } from '@/api/relation'
 import { message } from '@/utils/message'
+import { useNoteTransition } from '@/composables/noteTransition'
 
 const userStore = useUserStore()
 const route = useRoute()
 const router = useRouter()
+const { openNote } = useNoteTransition()
 
 // 当前激活的 tab
 const activeTab = ref('notes')
@@ -227,11 +222,12 @@ let loadSeq = 0
 
 
 
-// 点击笔记卡片：打开详情浮层（子路由），当前主页保持挂载
+// 点击笔记卡片：打开详情浮层（子路由），当前主页保持挂载。
+// 展开动画由 openNote 负责：封面从卡片原位扩张到详情媒体区
 const onNoteClick = (note) => {
   const noteId = note.id ?? note.noteId
   if (!noteId) return
-  router.push({
+  openNote(note, {
     path: `${route.path}/note/${noteId}`,
     query: route.query
   })
@@ -697,12 +693,13 @@ watch(() => route.params.userId, (newUserId, oldUserId) => {
   flex-direction: column;
 }
 
-/* 背景图层：内嵌圆角卡片，绝对定位在资料头部区域，不参与交互 */
+/* 背景图层：圆角卡片铺满内容宽度（与下方笔记瀑布流左右对齐），
+   绝对定位在资料头部区域，不参与交互 */
 .profile-bg {
   position: absolute;
   top: 16px;
-  left: 24px;
-  right: 24px;
+  left: 0;
+  right: 0;
   height: 240px;
   border-radius: var(--radius-card);
   overflow: hidden;

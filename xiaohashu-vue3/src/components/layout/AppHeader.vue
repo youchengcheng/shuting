@@ -376,17 +376,22 @@ onBeforeUnmount(() => {
   color: var(--color-ink);
 }
 
-.menu-enter-active,
+.menu-enter-active {
+  transition:
+    opacity 180ms var(--ease-standard),
+    transform 180ms var(--ease-standard);
+}
+
 .menu-leave-active {
   transition:
-    opacity var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-standard);
+    opacity 120ms var(--ease-standard),
+    transform 120ms var(--ease-standard);
 }
 
 .menu-enter-from,
 .menu-leave-to {
   opacity: 0;
-  transform: translateY(-6px);
+  transform: translateY(-4px) scale(0.97);
 }
 
 @media (max-width: 1023px) {

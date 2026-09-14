@@ -208,7 +208,7 @@ public class UserServiceImpl implements UserService {
                 && Objects.isNull(backgroundImgFile);
 
         if (needUpdate || removeBackgroundImg) {
-            //跟新用户元数据时先删除redis缓存中的数据----这里采用延迟双删策略
+            //更新用户元数据时先删除redis缓存中的数据----这里采用延迟双删策略
             deleteUserRedisCache(userId);
 
             if (needUpdate) {
@@ -226,6 +226,11 @@ public class UserServiceImpl implements UserService {
 //            userId = userDO.getId();
 //            LOCAL_CACHE.invalidate(userId);
 //            redisTemplate.delete(RedisKeyConstants.buildUserInfoKey(userId));
+
+            //本实例的本地缓存立即失效，不用等广播消息绕一圈回来
+            deleteUserLocalCache(userId);
+            //其他实例的本地缓存靠广播删除
+            sendUserProfileChangedMQ(userId);
 
             //更新完数据库之后再次删除redis中的数据
             sendDelayDeleteUserRedisCacheMQ(userId);
@@ -635,6 +640,15 @@ public class UserServiceImpl implements UserService {
     }
 
     /*
+    * 删除本地缓存：用户信息 + 主页资料
+    * */
+    @Override
+    public void deleteUserLocalCache(Long userId) {
+        LOCAL_CACHE.invalidate(userId);
+        PROFILE_LOCAL_CACHE.invalidate(userId);
+    }
+
+    /*
     * 异步延迟删除redis中的缓存数据
     * */
     private void sendDelayDeleteUserRedisCacheMQ(Long userId) {
@@ -654,6 +668,28 @@ public class UserServiceImpl implements UserService {
                 3000,//超时时间
                 1 //延迟一秒
         );
+    }
+
+    /*
+    * 广播通知所有实例：用户资料已变更
+    * */
+    private void sendUserProfileChangedMQ(Long userId) {
+        //构建消息体
+        Message<String> message = MessageBuilder.withPayload(String.valueOf(userId)).build();
+
+        //异步发送消息
+        rocketMQTemplate.asyncSend(MQConstants.TOPIC_USER_PROFILE_CHANGED, message, new SendCallback() {
+            @Override
+            public void onSuccess(SendResult sendResult) {
+                log.info("## 广播删除用户本地缓存消息发送成功...");
+            }
+
+            @Override
+            public void onException(Throwable e) {
+                // 发送失败不影响资料更新本身：本地缓存最长 1 小时 / 5 分钟会自动过期兜底
+                log.error("## 广播删除用户本地缓存消息发送失败...", e);
+            }
+        });
     }
 
     /*

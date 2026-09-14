@@ -1,6 +1,8 @@
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="confirm-mask" @click="onMaskClick"></div>
+    <Transition name="dialog-mask">
+      <div v-if="visible" class="confirm-mask" @click="onMaskClick"></div>
+    </Transition>
 
     <Transition name="confirm">
       <div v-if="visible" class="confirm-layer">
@@ -179,8 +181,8 @@ onUnmounted(() => {
 .confirm-enter-active,
 .confirm-leave-active {
   transition:
-    opacity var(--motion-base) var(--ease-standard),
-    transform var(--motion-base) var(--ease-standard);
+    opacity 240ms var(--ease-standard),
+    transform 240ms var(--ease-standard);
 }
 
 .confirm-enter-from,

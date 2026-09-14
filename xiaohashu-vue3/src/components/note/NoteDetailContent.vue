@@ -3,12 +3,14 @@
     <!-- 左侧媒体区域 -->
     <div class="note-detail__media">
       <div class="note-detail__media-inner">
-              <ImageCarousel v-if="currNote.type === 0" :images="currNote.imgUris || []" class="h-full w-full" />
-              <VideoPlayer v-else-if="currNote.type === 1"
+              <ImageCarousel v-if="mediaKind === 'image'" :images="mediaImages" class="h-full w-full" />
+              <VideoPlayer v-else-if="mediaKind === 'video'"
                       :video-url="currNote.videoUri"
                       :poster="currNote.cover"
                       :autoplay="true"
                     ></VideoPlayer>
+              <!-- 详情数据未到位：先用卡片上已加载的封面顶上，媒体区不空、展开动画也有连续图像 -->
+              <img v-else-if="mediaKind === 'cover'" class="note-detail__hero" :src="optimisticCover" alt="" />
               <!-- 笔记类型未确定时不渲染媒体组件，避免 VideoPlayer 黑底闪现 -->
             </div>
           </div>
@@ -318,11 +320,13 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { followUser, unfollowUser } from '@/api/relation'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useNoteStore } from '@/stores/note'
 import { message } from '@/utils/message'
 import { uploadFile } from '@/api/file' // 导入文件上传API
 
 const router = useRouter()
 const userStore = useUserStore()
+const noteStore = useNoteStore()
 
 const props = defineProps({
   noteId: {
@@ -338,6 +342,26 @@ const props = defineProps({
 const currNote = ref({})
 const currNoteId = ref('')
 const isFollowing = ref(false)
+
+// 打开详情时卡片上已经加载好的封面：数据到位前先顶上媒体区
+const optimisticCover = computed(() => {
+  const hero = noteStore.pendingHero
+  if (!hero || String(hero.noteId) !== String(props.noteId)) return ''
+  return hero.cover || ''
+})
+
+// 媒体区形态：图片 / 视频 / 占位封面（数据未到位）
+const mediaKind = computed(() => {
+  if (currNote.value.type === 0) return 'image'
+  if (currNote.value.type === 1) return 'video'
+  return optimisticCover.value ? 'cover' : 'none'
+})
+
+const mediaImages = computed(() => {
+  const images = currNote.value.imgUris || []
+  if (images.length) return images
+  return optimisticCover.value ? [optimisticCover.value] : []
+})
 
 const emit = defineEmits(['update:visible'])
 
@@ -1271,6 +1295,14 @@ input:focus::placeholder {
   justify-content: center;
   width: 100%;
   height: 100%;
+}
+
+/* 数据未到位时的占位封面：与轮播里的图片保持同样的等比撑满方式 */
+.note-detail__hero {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
 }
 
 .note-detail__panel {

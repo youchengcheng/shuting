@@ -34,36 +34,46 @@
     <div class="relation-panel">
       <LoadingSpinner ref="loadingRef" />
 
-      <EmptyState
-        v-if="users.length === 0"
-        :title="activeTab === 'following' ? '暂未关注其他用户' : '暂无粉丝'"
-        description="遇到喜欢的创作者，关注一下就能在这里找到"
-      />
+      <!-- 切换关注/粉丝或重新拉取列表时整块淡换：旧列表先淡出，
+           等数据就绪再淡入新列表，避免内容硬切 -->
+      <Transition name="content-swap" mode="out-in">
+        <div :key="`${activeTab}-${contentToken}`" class="relation-panel__body">
+          <div v-if="loading && users.length === 0" class="relation-panel__loading">
+            <span class="st-spinner"></span>
+          </div>
 
-      <template v-else>
-        <div v-for="user in users" :key="user.userId" class="relation-item">
-          <UserCard
-            :user="user"
-            :type="listType"
-            @follow="handleFollowUser"
-            @login-required="handleLoginRequired"
+          <EmptyState
+            v-else-if="users.length === 0"
+            :title="activeTab === 'following' ? '暂未关注其他用户' : '暂无粉丝'"
+            description="遇到喜欢的创作者，关注一下就能在这里找到"
           />
-        </div>
 
-        <!-- 加载更多 -->
-        <div v-if="hasMore" class="load-more-row">
-          <button type="button" class="st-btn st-btn-ghost" :disabled="loadingMore" @click="loadMore">
-            {{ loadingMore ? '加载中…' : '加载更多' }}
-          </button>
-        </div>
+          <template v-else>
+            <div v-for="user in users" :key="user.userId" class="relation-item">
+              <UserCard
+                :user="user"
+                :type="listType"
+                @follow="handleFollowUser"
+                @login-required="handleLoginRequired"
+              />
+            </div>
 
-        <!-- 底线提示 -->
-        <div class="bottom-line">
-          <span class="bottom-line__rule"></span>
-          <span class="bottom-line__text">书亭是有底线的</span>
-          <span class="bottom-line__rule"></span>
+            <!-- 加载更多 -->
+            <div v-if="hasMore" class="load-more-row">
+              <button type="button" class="st-btn st-btn-ghost" :disabled="loadingMore" @click="loadMore">
+                {{ loadingMore ? '加载中…' : '加载更多' }}
+              </button>
+            </div>
+
+            <!-- 底线提示 -->
+            <div class="bottom-line">
+              <span class="bottom-line__rule"></span>
+              <span class="bottom-line__text">书亭是有底线的</span>
+              <span class="bottom-line__rule"></span>
+            </div>
+          </template>
         </div>
-      </template>
+      </Transition>
     </div>
   </div>
 </template>
@@ -83,6 +93,8 @@ const nickname = ref('')
 const activeTab = ref(route.query.tab || 'following')
 const users = ref([])
 const loading = ref(true)
+// 首页数据就绪后 +1：用它换 key，触发列表整块淡换（加载态 → 内容）
+const contentToken = ref(0)
 const loadingMore = ref(false)
 const hasMore = ref(true)
 const pageNo = ref(1)
@@ -137,6 +149,7 @@ const fetchFollowingList = async (isLoadMore = false) => {
   } finally {
     loading.value = false
     loadingMore.value = false
+    if (!isLoadMore) contentToken.value += 1
     // loadingRef.value?.hide()
   }
 }
@@ -179,6 +192,7 @@ const fetchFollowersList = async (isLoadMore = false) => {
   } finally {
     loading.value = false
     loadingMore.value = false
+    if (!isLoadMore) contentToken.value += 1
     // loadingRef.value?.hide()
   }
 }
@@ -308,6 +322,14 @@ onUnmounted(() => {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-panel);
   background: var(--color-paper);
+}
+
+/* 列表拉取中：内容未就绪时占位，避免旧列表被清空后整块塌陷 */
+.relation-panel__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
 }
 
 .relation-item + .relation-item {

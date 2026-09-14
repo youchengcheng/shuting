@@ -1,16 +1,11 @@
 <template>
-  <Teleport to="body">
+    <Teleport to="body">
     <!-- 遮罩层 - 调整透明度和模糊效果 -->
-    <div v-if="visible" class="fixed inset-0 bg-ink/30 z-[100]"></div>
+    <Transition name="dialog-mask">
+      <div v-if="visible" class="fixed inset-0 bg-ink/30 z-[100]"></div>
+    </Transition>
     
-    <Transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="transform scale-95 opacity-0"
-      enter-to-class="transform scale-100 opacity-100"
-      leave-active-class="transition duration-150 ease-in"
-      leave-from-class="transform scale-100 opacity-100"
-      leave-to-class="transform scale-95 opacity-0"
-    >
+    <Transition name="dialog">
       <!-- 发布笔记模态框 -->
       <div v-if="visible" class="fixed inset-0 z-[101] flex items-center justify-center p-4">
         <div class="relative bg-paper w-[800px] rounded-panel flex flex-col max-h-[90vh] shadow-panel">
