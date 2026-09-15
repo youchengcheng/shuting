@@ -5,24 +5,33 @@
     role="dialog"
     aria-modal="true"
     aria-label="笔记详情"
-    @click.self="handleClose"
   >
-    <button type="button" class="note-overlay__close" aria-label="关闭" @click="handleClose">
+    <!-- 遮罩单独一层：展开时它只负责「变暗」，封面与卡片各自演各自的 -->
+    <div class="note-overlay__scrim" data-overlay-scrim @click="handleClose"></div>
+
+    <button
+      type="button"
+      class="note-overlay__close"
+      data-overlay-close
+      aria-label="关闭"
+      @click="handleClose"
+    >
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
       </svg>
     </button>
 
-    <div class="note-overlay__card">
+    <div class="note-overlay__card" data-overlay-card>
       <NoteDetailContent :note-id="noteId" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NoteDetailContent from '@/components/note/NoteDetailContent.vue'
+import { playOpenMorph } from '@/composables/noteMorph'
 import { useNoteTransition } from '@/composables/noteTransition'
 import { useNoteStore } from '@/stores/note'
 
@@ -39,6 +48,7 @@ const noteStore = useNoteStore()
 const { closeNote } = useNoteTransition()
 
 const overlayRef = ref(null)
+const closing = ref(false)
 
 // 关闭浮层：回到打开前所在的页面（信息流 / 个人页 / 搜索页），
 // 底层页面全程保持挂载，所以返回后不会重新请求数据、也不会丢失滚动位置。
@@ -52,8 +62,11 @@ const close = () => {
   router.replace(route.path.replace(/\/note\/[^/]+$/, '') || '/discover')
 }
 
-// 关闭时封面反向收回卡片原位；过渡进行期间浮层立刻从新画面里拿掉，避免残留
+// 关闭时封面沿原路飞回卡片原位；收回动画播完才切换路由，
+// 过渡期间浮层立刻从新画面里拿掉，避免残留
 const handleClose = () => {
+  if (closing.value) return
+  closing.value = true
   closeNote(props.noteId, () => {
     close()
     if (overlayRef.value) overlayRef.value.style.display = 'none'
@@ -65,10 +78,14 @@ const handleKeydown = (event) => {
 }
 
 // 浮层打开期间锁定背景滚动
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('keydown', handleKeydown)
   document.body.style.overflow = 'hidden'
   document.documentElement.style.overflow = 'hidden'
+
+  // 展开动画：封面从卡片原位飞到媒体区（起点由 openNote 记录在 store 里）
+  await nextTick()
+  playOpenMorph({ overlayEl: overlayRef.value, hero: noteStore.pendingHero })
 })
 
 onBeforeUnmount(() => {
@@ -89,10 +106,17 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 56px 88px;
+}
+
+.note-overlay__scrim {
+  position: absolute;
+  inset: 0;
   background: rgb(0 0 0 / 0.62);
 }
 
 .note-overlay__card {
+  position: relative;
+  z-index: 1;
   width: min(1080px, 100%);
   height: min(760px, 100%);
   border-radius: var(--radius-card);
@@ -103,6 +127,7 @@ onBeforeUnmount(() => {
 
 .note-overlay__close {
   position: fixed;
+  z-index: 3;
   top: 24px;
   left: 24px;
   display: flex;
@@ -128,39 +153,6 @@ onBeforeUnmount(() => {
 .note-overlay__close svg {
   width: 20px;
   height: 20px;
-}
-
-/* 进出场过渡：遮罩淡入淡出 + 卡片轻微上浮 */
-.note-overlay-enter-active,
-.note-overlay-leave-active {
-  transition: opacity 220ms var(--ease-standard);
-}
-
-.note-overlay-enter-active .note-overlay__card,
-.note-overlay-leave-active .note-overlay__card {
-  transition:
-    opacity 220ms var(--ease-standard),
-    transform 260ms var(--ease-standard);
-}
-
-.note-overlay-enter-from,
-.note-overlay-leave-to {
-  opacity: 0;
-}
-
-.note-overlay-enter-from .note-overlay__card,
-.note-overlay-leave-to .note-overlay__card {
-  opacity: 0;
-  transform: translateY(18px) scale(0.985);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .note-overlay-enter-active,
-  .note-overlay-leave-active,
-  .note-overlay-enter-active .note-overlay__card,
-  .note-overlay-leave-active .note-overlay__card {
-    transition-duration: 1ms;
-  }
 }
 
 @media (max-width: 1279px) {

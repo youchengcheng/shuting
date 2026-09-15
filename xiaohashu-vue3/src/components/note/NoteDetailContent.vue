@@ -1,7 +1,7 @@
 <template>
   <div class="note-detail">
-    <!-- 左侧媒体区域 -->
-    <div class="note-detail__media">
+    <!-- 左侧媒体区域（data-note-media：展开动画的落点，见 composables/noteMorph.js） -->
+    <div class="note-detail__media" data-note-media>
       <div class="note-detail__media-inner">
               <ImageCarousel v-if="mediaKind === 'image'" :images="mediaImages" class="h-full w-full" />
               <VideoPlayer v-else-if="mediaKind === 'video'"
@@ -15,8 +15,8 @@
             </div>
           </div>
 
-          <!-- 右侧内容区域 -->
-          <div class="note-detail__panel">
+          <!-- 右侧内容区域（data-note-panel：展开动画里错峰淡入） -->
+          <div class="note-detail__panel" data-note-panel>
 
             <!-- 作者信息 -->
             <div 

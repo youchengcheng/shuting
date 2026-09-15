@@ -69,6 +69,9 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-color: var(--color-canvas);
+    /* 笔记详情浮层会把根元素的滚动条藏起来（lock 滚动），
+       预留沟槽后页面宽度不变，背景信息流不会在开场瞬间横向抖一下 */
+    scrollbar-gutter: stable;
   }
 
   body {
@@ -458,30 +461,6 @@
     transform: translateY(8px);
   }
 
-  /* 笔记详情：封面从卡片原位扩张到媒体区（View Transitions API）。
-     html.note-vt 由 composables/noteTransition.js 控制：
-     - 媒体区在过渡期间接管 note-hero 命名
-     - 浮层自身不播淡入淡出，进出场完全交给共享元素动画 */
-  html.note-vt .note-detail__media {
-    view-transition-name: note-hero;
-  }
-
-  html.note-vt .note-overlay {
-    transition: none !important;
-  }
-
-  html.note-vt .note-overlay.note-overlay-enter-from,
-  html.note-vt .note-overlay.note-overlay-leave-to {
-    /* 快照阶段浮层必须可见，遮罩的明暗由上层 root 过渡负责 */
-    opacity: 1 !important;
-  }
-
-  html.note-vt .note-overlay__card {
-    transition: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-
   .page-header__desc {
     margin-top: 8px;
     font-size: 13px;
@@ -497,39 +476,5 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
-  }
-}
-
-/* --------------------------------------------------------------------------
-   笔记详情：封面从卡片原位扩张到详情媒体区（View Transitions API）
-   形变只发生在 note-hero 上，页面其余部分（遮罩 + 面板）整体淡入，
-   避免整页快照交叉淡化带来的糊化
-   -------------------------------------------------------------------------- */
-::view-transition-group(note-hero) {
-  animation-duration: 420ms;
-  animation-timing-function: var(--ease-standard);
-}
-
-::view-transition-old(note-hero),
-::view-transition-new(note-hero) {
-  animation-duration: 220ms;
-}
-
-::view-transition-old(root) {
-  animation: none;
-  opacity: 1;
-}
-
-::view-transition-new(root) {
-  animation: note-vt-veil 260ms var(--ease-standard);
-}
-
-@keyframes note-vt-veil {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
   }
 }
