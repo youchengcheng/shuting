@@ -31,12 +31,10 @@
       <button class="retry-btn" @click="retry">重新加载</button>
     </EmptyState>
 
-    <!-- 笔记详情浮层：以子路由渲染，关闭时只卸载浮层，当前信息流不会重新加载 -->
-    <router-view v-slot="{ Component }">
-      <Transition name="note-overlay">
-        <component :is="Component" />
-      </Transition>
-    </router-view>
+    <!-- 笔记详情浮层：以子路由渲染，关闭时只卸载浮层，当前信息流不会重新加载。
+         展开 / 收起动画由浮层自己驱动（见 composables/noteMorph.js），
+         这里不再套 Transition，避免两套动画互相打断 -->
+    <router-view />
   </div>
 </template>
 

@@ -167,12 +167,9 @@
       @confirm="confirmPrivateNote"
     />
 
-    <!-- 笔记详情浮层：以子路由渲染，关闭时只卸载浮层，当前主页不会重新加载 -->
-    <router-view v-slot="{ Component }">
-      <Transition name="note-overlay">
-        <component :is="Component" />
-      </Transition>
-    </router-view>
+    <!-- 笔记详情浮层：以子路由渲染，关闭时只卸载浮层，当前主页不会重新加载。
+         展开 / 收起动画由浮层自己驱动（见 composables/noteMorph.js） -->
+    <router-view />
   </div>
 </template>
 
