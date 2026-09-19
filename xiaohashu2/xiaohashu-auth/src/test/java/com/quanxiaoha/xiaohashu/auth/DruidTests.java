@@ -19,7 +19,7 @@ class DruidTests {
     @SneakyThrows
     void testEncodePassword() {
         // 你的密码
-        String password = "123456";
+        String password = "YOUR_TEST_PASSWORD_HERE";
         String[] arr = ConfigTools.genKeyPair(512);
 
         // 私钥
