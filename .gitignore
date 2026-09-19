@@ -49,13 +49,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# --- 敏感配置文件 ---
-.env
+# --- 敏感配置文件（已放开，敏感值已做占位处理） ---
 .env.local
 .env.*.local
 
-application-dev.yml
-application-dev.yaml
 application-secret.yml
 application-secret.yaml
 application-prod.yml
@@ -66,10 +63,6 @@ bootstrap-secret.yaml
 *-secret.yaml
 application-*.local.yml
 application-*.local.yaml
-
-# AI助手项目 - 全部配置文件忽略
-project/xiaoha-ai-robot-springboot/**/*.yml
-project/xiaoha-ai-robot-springboot/**/*.yaml
 
 # --- IDE / 编辑器缓存 ---
 .idea/
