@@ -49,20 +49,20 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# --- 敏感配置文件（已放开，敏感值已做占位处理） ---
+# --- 敏感配置文件 ---
+.env
 .env.local
 .env.*.local
 
-application-secret.yml
-application-secret.yaml
-application-prod.yml
-application-prod.yaml
-bootstrap-secret.yml
-bootstrap-secret.yaml
-*-secret.yml
-*-secret.yaml
-application-*.local.yml
-application-*.local.yaml
+# 所有 yml / yaml 配置文件全部忽略
+**/*.yml
+**/*.yaml
+
+# --- 敏感非 yml 配置文件 ---
+**/generatorConfig.xml
+**/leaf.properties
+**/mcp-servers-config.json
+**/DruidTests.java
 
 # --- IDE / 编辑器缓存 ---
 .idea/
