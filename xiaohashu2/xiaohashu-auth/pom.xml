@@ -104,6 +104,12 @@
             <artifactId>xiaoha-spring-boot-starter-biz-context</artifactId>
         </dependency>
 
+        <!-- 接口幂等组件 -->
+        <dependency>
+            <groupId>com.quanxiaoha</groupId>
+            <artifactId>xiaoha-spring-boot-starter-biz-idempotent</artifactId>
+        </dependency>
+
         <!-- 密码加密 -->
         <dependency>
             <groupId>org.springframework.security</groupId>

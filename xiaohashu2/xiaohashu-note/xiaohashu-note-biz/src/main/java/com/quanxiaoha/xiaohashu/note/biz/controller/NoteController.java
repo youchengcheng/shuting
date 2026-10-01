@@ -1,5 +1,7 @@
 package com.quanxiaoha.xiaohashu.note.biz.controller;
 
+import com.quanxiaoha.framework.biz.idempotent.annotation.Idempotent;
+import com.quanxiaoha.framework.biz.idempotent.enums.IdempotentPolicyEnum;
 import com.quanxiaoha.framework.biz.operationlog.aspect.ApiOperationLog;
 import com.quanxiaoha.framework.common.response.Response;
 import com.quanxiaoha.xiaohashu.note.biz.model.vo.*;
@@ -29,6 +31,7 @@ public class NoteController {
     * */
     @PostMapping("/publish")
     @ApiOperationLog(description = "发布笔记")
+    @Idempotent(policy = IdempotentPolicyEnum.TOKEN)
     public Response<?> publishNote(@Validated @RequestBody PublishNoteReqVO publishNoteReqVO){
         return noteService.publishNote(publishNoteReqVO);
     }

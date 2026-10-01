@@ -1,5 +1,7 @@
 package com.quanxiaoha.xiaohashu.auth.controller;
 
+import com.quanxiaoha.framework.biz.idempotent.annotation.Idempotent;
+import com.quanxiaoha.framework.biz.idempotent.enums.IdempotentPolicyEnum;
 import com.quanxiaoha.framework.biz.operationlog.aspect.ApiOperationLog;
 import com.quanxiaoha.framework.common.response.Response;
 import com.quanxiaoha.xiaohashu.auth.model.vo.verificationcode.SendVerificationCodeReqVO;
@@ -23,6 +25,7 @@ public class VerificationCodeController {
 
     @PostMapping("/verification/code/send")
     @ApiOperationLog(description = "发送短信验证码")
+    @Idempotent(policy = IdempotentPolicyEnum.PARAM, key = "'sms:verification:code:' + #a0.phone", ttl = 180, message = "请求太频繁，请3分钟后再试")
     public Response<?> send(@Validated @RequestBody SendVerificationCodeReqVO sendVerificationCodeReqVO) {
         return verificationCodeService.send(sendVerificationCodeReqVO);
     }

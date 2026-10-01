@@ -122,6 +122,13 @@
                 <version>${revision}</version>
             </dependency>
 
+            <!-- 接口幂等组件 -->
+            <dependency>
+                <groupId>com.quanxiaoha</groupId>
+                <artifactId>xiaoha-spring-boot-starter-biz-idempotent</artifactId>
+                <version>${revision}</version>
+            </dependency>
+
             <!-- Spring Boot 官方依赖管理 -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>

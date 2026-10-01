@@ -316,6 +316,7 @@ import ImageCarousel from '@/components/common/ImageCarousel.vue'
 import VideoPlayer from '@/components/common/VideoPlayer.vue'
 import { getNoteDetail, likeNote, unlikeNote, collectNote, uncollectNote, isLikedAndCollectedData } from '@/api/note' // 获取笔记详情的API
 import { getCommentList, publishComment, getChildCommentList, likeComment, unlikeComment, deleteComment } from '@/api/comment'
+import { fetchIdempotentToken } from '@/api/idempotent'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { followUser, unfollowUser } from '@/api/relation'
 import { useRouter } from 'vue-router'
@@ -696,7 +697,7 @@ const findParentComment = (commentId, commentsList) => {
 }
 
 // 修改发布评论函数
-const handlePublishComment = () => {
+const handlePublishComment = async () => {
   
   // 检查是否有内容或图片
   if (!commentContent.value.trim() && !commentImage.value) {
@@ -704,12 +705,15 @@ const handlePublishComment = () => {
     return
   }
   
+  // 发布评论前先申请幂等 Token，防止重复评论（申请失败自动降级为无 Token，后端灰度放行）
+  const idempotentToken = await fetchIdempotentToken()
+
   publishComment({
     noteId: currNoteId.value,
     content: commentContent.value,
     replyCommentId: replyTo.value?.commentId,
     imageUrl: commentImage.value
-  }).then(res => {
+  }, idempotentToken).then(res => {
     if (res.success) {
       message.show('评论成功')
       
