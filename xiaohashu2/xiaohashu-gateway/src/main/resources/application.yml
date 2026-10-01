@@ -22,6 +22,12 @@ spring:
             - Path=/note/**
           filters:
             - StripPrefix=0
+        - id: idempotent
+          uri: lb://xiaohashu-note
+          predicates:
+            - Path=/idempotent/**
+          filters:
+            - StripPrefix=0
         - id: user-relation
           uri: lb://xiaohashu-user-relation
           predicates:

@@ -3,9 +3,11 @@ import axios from "@/axios";
 // 接口前缀
 const API_PREFIX = '/note'
 
-// 发布笔记
-export function publishNote(note) {
-    return axios.post(`${API_PREFIX}/publish`, note)
+// 发布笔记：携带幂等 Token，防止重复落库/发 MQ/计数翻倍；Token 为空时不携带请求头，后端灰度放行
+export function publishNote(note, idempotentToken) {
+    return axios.post(`${API_PREFIX}/publish`, note, {
+        headers: idempotentToken ? { 'Idempotent-Token': idempotentToken } : {}
+    })
 }
 
 // 获取发现页笔记数据

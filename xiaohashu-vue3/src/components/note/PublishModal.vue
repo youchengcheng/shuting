@@ -537,6 +537,7 @@ import { useChannelStore } from '@/stores/channel'
 import { getTopicList } from '@/api/topic'
 import { uploadFile } from '@/api/file'
 import { publishNote, updateNote } from '@/api/note'
+import { fetchIdempotentToken } from '@/api/idempotent'
 import { message } from '@/utils/message'
 import { useNoteStore } from '@/stores/note'
 import { useRouter } from 'vue-router'
@@ -1082,7 +1083,11 @@ const handlePublish = async () => {
     }
 
     isPublishing.value = true
-    const res = isEditMode.value ? await updateNote(noteData) : await publishNote(noteData)
+
+    // 发布笔记前先申请幂等 Token；编辑不涉及重复发布，无需 Token（申请失败自动降级为无 Token）
+    const idempotentToken = isEditMode.value ? null : await fetchIdempotentToken()
+
+    const res = isEditMode.value ? await updateNote(noteData) : await publishNote(noteData, idempotentToken)
 
     if (res.success) {
       // 成功：先播放成功过渡动画，再关闭弹窗

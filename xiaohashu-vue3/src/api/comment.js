@@ -8,9 +8,11 @@ export function getCommentList(noteId, pageNo) {
     return axios.post(`${API_PREFIX}/list`, {noteId, pageNo})
 }
 
-// 发布评论
-export function publishComment(comment) {
-    return axios.post(`${API_PREFIX}/publish`, comment)
+// 发布评论：携带幂等 Token，防止重复评论；Token 为空时不携带请求头，后端灰度放行
+export function publishComment(comment, idempotentToken) {
+    return axios.post(`${API_PREFIX}/publish`, comment, {
+        headers: idempotentToken ? { 'Idempotent-Token': idempotentToken } : {}
+    })
 }
 
 // 获取笔记二级评论分页数据

@@ -1,5 +1,7 @@
 package com.quanxiaoha.xiaohashu.comment.biz.controller;
 
+import com.quanxiaoha.framework.biz.idempotent.annotation.Idempotent;
+import com.quanxiaoha.framework.biz.idempotent.enums.IdempotentPolicyEnum;
 import com.quanxiaoha.framework.biz.operationlog.aspect.ApiOperationLog;
 import com.quanxiaoha.framework.common.response.PageResponse;
 import com.quanxiaoha.framework.common.response.Response;
@@ -29,6 +31,7 @@ public class CommentController {
     * */
     @PostMapping("/publish")
     @ApiOperationLog(description = "发布评论")
+    @Idempotent(policy = IdempotentPolicyEnum.TOKEN)
     public Response<?> pubilishComment(@Validated @RequestBody PublishCommentReqVO publishCommentReqVO){
         return commentService.publishComment(publishCommentReqVO);
     }
