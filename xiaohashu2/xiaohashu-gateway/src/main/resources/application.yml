@@ -52,6 +52,13 @@ spring:
             - Path=/search/**
           filters:
             - StripPrefix=0
+        # AI 服务没有接入 Nacos，这里用固定地址路由（AI 服务端口 8090）
+        - id: ai
+          uri: http://127.0.0.1:8090
+          predicates:
+            - Path=/ai/**
+          filters:
+            - StripPrefix=0
       globalcors:
         add-to-simple-url-handler-mapping: true
         cors-configurations:

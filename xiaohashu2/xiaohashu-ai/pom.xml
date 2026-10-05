@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        重要：本模块的 parent 刻意指向 spring-boot-starter-parent:3.4.5，
+        而不是 xiaohashu 根 pom（Boot 3.0.2 / Spring Cloud 2022.0.0 / SCA 2022.0.0.0）。
+
+        原因：Spring AI 1.1.1 要求 Spring Boot >= 3.4，无法与根 pom 的 Boot 3.0.2 依赖管理共存。
+        所以 AI 模块的依赖版本完全由自身控制，仅在根 pom 的 <modules> 中参与聚合构建，
+        不继承根 pom 的任何 dependencyManagement / pluginManagement。
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.quanxiaoha</groupId>
+    <artifactId>xiaohashu-ai</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>${project.artifactId}</name>
+    <description>小哈书 AI 服务：对话助手 + 笔记分析 + AI 客服（依赖版本独立于 xiaohashu 父工程）</description>
+
+    <modules>
+        <module>xiaohashu-ai-biz</module>
+    </modules>
+
+</project>

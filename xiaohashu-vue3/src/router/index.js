@@ -58,6 +58,20 @@ const router = createRouter({
           ]
         },
         {
+          // AI 助手：用自然语言检索全站已发布笔记，判断对题后润色返回
+          path: '/ai',
+          name: 'AiAssistant',
+          component: () => import('@/views/AiAssistant.vue'),
+          children: [
+            {
+              path: 'note/:noteId',
+              name: 'AiNoteDetail',
+              component: NoteDetailOverlay,
+              props: true
+            }
+          ]
+        },
+        {
           // 直接访问笔记链接时，落到信息流之上的浮层
           path: '/note/:noteId',
           redirect: to => ({ path: `/discover/note/${to.params.noteId}` })

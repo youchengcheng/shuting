@@ -44,6 +44,9 @@
         <module>xiaohashu-search</module>
         <!-- 评论服务-->
         <module>xiaohashu-comment</module>
+
+        <!-- AI 服务（依赖版本独立于本父工程，自管 Spring Boot 3.4.5 + Spring AI） -->
+        <module>xiaohashu-ai</module>
     </modules>
 
     <properties>

@@ -13,6 +13,8 @@ public enum NoteOperateEnum {
     PUBLISH(1),
     // 笔记删除
     DELETE(0),
+    // 笔记更新（AI 检索索引需要同步）
+    UPDATE(2),
     ;
 
     private final Integer code;
