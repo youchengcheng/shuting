@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.quanxiaoha</groupId>
+        <artifactId>xiaohashu-ai</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>xiaohashu-ai-biz</artifactId>
+    <packaging>jar</packaging>
+    <name>${project.artifactId}</name>
+    <description>AI 服务业务层</description>
+
+    <properties>
+        <!-- 与 xiaohashu2 保持一致的 JDK 版本（Spring AI 1.1 最低要求 17） -->
+        <java.version>17</java.version>
+
+        <!-- 本模块自己管理的版本，不依赖 xiaohashu 根 pom -->
+        <spring-ai.version>1.1.1</spring-ai.version>
+        <mybatis-plus.version>3.5.12</mybatis-plus.version>
+        <okhttp.version>4.12.0</okhttp.version>
+        <jsoup.version>1.17.2</jsoup.version>
+        <hutool.version>5.8.39</hutool.version>
+        <commons-lang3.version>3.12.0</commons-lang3.version>
+        <commons-io.version>2.20.0</commons-io.version>
+        <guava.version>33.0.0-jre</guava.version>
+        <mysql-connector.version>8.0.29</mysql-connector.version>
+        <!-- RocketMQ：与仓库其它模块保持同一版本线（2.2.3 + client 4.9.4） -->
+        <rocketmq.version>2.2.3</rocketmq.version>
+        <rocketmq-client.version>4.9.4</rocketmq-client.version>
+
+        <!-- xiaoha-framework 组件版本，与 xiaohashu 根 pom 的 revision 保持一致 -->
+        <xiaoha-framework.version>0.0.1-SNAPSHOT</xiaoha-framework.version>
+    </properties>
+
+    <!-- 本模块独立的依赖版本管理 -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring AI（Boot 版本由 spring-boot-starter-parent:3.4.5 提供） -->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- MyBatis Plus -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-bom</artifactId>
+                <version>${mybatis-plus.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- ==================== 小哈书通用组件（显式指定版本） ==================== -->
+        <dependency>
+            <groupId>com.quanxiaoha</groupId>
+            <artifactId>xiaoha-common</artifactId>
+            <version>${xiaoha-framework.version}</version>
+        </dependency>
+        <!-- 用户上下文组件：从网关透传的 userId 请求头中取当前登录用户 -->
+        <dependency>
+            <groupId>com.quanxiaoha</groupId>
+            <artifactId>xiaoha-spring-boot-starter-biz-context</artifactId>
+            <version>${xiaoha-framework.version}</version>
+        </dependency>
+        <!-- Jackson 组件：Long 转 String，避免前端精度丢失 -->
+        <dependency>
+            <groupId>com.quanxiaoha</groupId>
+            <artifactId>xiaoha-spring-boot-starter-jackson</artifactId>
+            <version>${xiaoha-framework.version}</version>
+        </dependency>
+        <!-- 接口日志组件 -->
+        <dependency>
+            <groupId>com.quanxiaoha</groupId>
+            <artifactId>xiaoha-spring-boot-starter-biz-operationlog</artifactId>
+            <version>${xiaoha-framework.version}</version>
+        </dependency>
+
+        <!-- ==================== Web ==================== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- ==================== Spring AI ==================== -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+        <!-- PGVector 向量库（笔记检索索引），数据源与业务 MySQL 分离 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+        </dependency>
+        <!-- ==================== RocketMQ ==================== -->
+        <!-- 本模块 parent 是 spring-boot-starter-parent，不继承 xiaohashu2 根 pom 的
+             dependencyManagement，因此 rocketmq 的版本必须显式声明（与仓库其它模块一致）。 -->
+        <dependency>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-spring-boot-starter</artifactId>
+            <version>${rocketmq.version}</version>
+        </dependency>
+        <!-- 显式声明 client 4.9.4：starter 传递的是 5.0.0，仓库其它模块统一用 4.9.4 -->
+        <dependency>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-client</artifactId>
+            <version>${rocketmq-client.version}</version>
+        </dependency>
+
+        <!-- ==================== Cassandra（笔记正文读取） ==================== -->
+        <!-- 只读 Cassandra 的 note_content 表；不引入 Spring Data Cassandra，
+             用官方 driver 手工建 session，做到用到才连，不影响应用启动。 -->
+        <!-- 版本由 spring-boot-dependencies 3.4.5 统一管理（org.apache.cassandra:4.18.1） -->
+        <dependency>
+            <groupId>org.apache.cassandra</groupId>
+            <artifactId>java-driver-core</artifactId>
+        </dependency>
+
+        <!-- ==================== ORM ==================== -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+        </dependency>
+
+        <!-- ==================== 数据库驱动 ==================== -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>${mysql-connector.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ==================== Redis（笔记分析缓存 / 会话缓存） ==================== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-pool2</artifactId>
+        </dependency>
+
+        <!-- ==================== 工具类 ==================== -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>${okhttp.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>${jsoup.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>${hutool.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons-lang3.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>${commons-io.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guava.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ==================== 测试 ==================== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

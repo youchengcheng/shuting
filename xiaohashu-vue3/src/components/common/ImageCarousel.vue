@@ -59,6 +59,7 @@
       <button 
         v-if="images.length > 1 && showControls"
         class="carousel-btn left-4" 
+        :disabled="isFirstPage"
         @click="prev"
       >
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -71,6 +72,7 @@
       <button 
         v-if="images.length > 1 && showControls"
         class="carousel-btn right-4" 
+        :disabled="isLastPage"
         @click="next"
       >
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -103,8 +105,9 @@
 </template>
 
 <script setup>
-import { ref, watch, onBeforeUnmount, onMounted } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import ImagePreview from './ImagePreview.vue'
+import { message } from '@/utils/message'
 
 const props = defineProps({
   images: {
@@ -115,6 +118,9 @@ const props = defineProps({
 })
 
 const currentIndex = ref(0)
+// 是否处于第一张/最后一张图片：处于边界时对应方向的切换按钮置灰不可用
+const isFirstPage = computed(() => currentIndex.value === 0)
+const isLastPage = computed(() => props.images.length > 1 && currentIndex.value === props.images.length - 1)
 const imageRefs = ref([])
 const showControls = ref(false)
 const showPreview = ref(false)
@@ -150,6 +156,13 @@ watch(() => props.images, (newImages) => {
     currentIndex.value = 0
   }
 }, { immediate: true })
+
+// 滑动到最后一张图片时提示用户
+watch(currentIndex, (index) => {
+  if (props.images.length > 1 && index === props.images.length - 1) {
+    message.show('这是最后一页')
+  }
+})
 
 // 键盘事件处理
 const handleKeydown = (e) => {
@@ -257,6 +270,17 @@ const handleWheel = (e) => {
 
 .carousel-btn:hover {
   background-color: rgba(0, 0, 0, 0.4);
+}
+
+/* 边界状态：按钮置灰且不可交互 */
+.carousel-btn:disabled {
+  background-color: rgba(0, 0, 0, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: not-allowed;
+}
+
+.carousel-btn:disabled:hover {
+  background-color: rgba(0, 0, 0, 0.08);
 }
 
 /* 添加计数器的动画效果 */

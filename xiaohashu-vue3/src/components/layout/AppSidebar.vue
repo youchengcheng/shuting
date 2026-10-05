@@ -18,7 +18,12 @@
       </router-link>
 
       <!-- AI 助手 -->
-      <button type="button" class="nav-item" @click="handleAiEntry">
+      <button
+        type="button"
+        class="nav-item"
+        :class="{ 'nav-item--active': isAiPage }"
+        @click="handleAiEntry"
+      >
         <span class="nav-item__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none">
             <path
@@ -146,13 +151,16 @@
 
 <script setup>
 import { computed, inject, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import MoreMenu from './MoreMenu.vue'
 import AboutModal from './AboutModal.vue'
 import ChangePasswordModal from '@/components/auth/ChangePasswordModal.vue'
-import { message } from '@/utils/message'
+
 import defaultAvatar from '@/assets/avatar.png'
 
+const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const showLoginModal = inject('showLoginModal')
@@ -163,6 +171,7 @@ const showAboutModal = ref(false)
 const showChangePasswordModal = ref(false)
 
 const isLoggedIn = computed(() => !!userStore.token)
+const isAiPage = computed(() => route.path.startsWith('/ai'))
 const profile = computed(() => userStore.profile || {})
 
 const handleShowLogin = () => {
@@ -170,7 +179,11 @@ const handleShowLogin = () => {
 }
 
 const handleAiEntry = () => {
-  message.show('AI 助手即将上线，敬请期待')
+  if (!isLoggedIn.value) {
+    handleShowLogin()
+    return
+  }
+  router.push('/ai')
 }
 
 const handlePublish = () => {

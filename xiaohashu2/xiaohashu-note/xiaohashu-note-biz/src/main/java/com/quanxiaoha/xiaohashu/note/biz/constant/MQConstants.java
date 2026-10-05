@@ -69,6 +69,11 @@ public interface MQConstants {
     String TAG_NOTE_DELETE = "deleteNote";
 
     /**
+     * Tag 标签：笔记更新（AI 模块增量同步检索索引）
+     */
+    String TAG_NOTE_UPDATE = "updateNote";
+
+    /**
      * Topic 主题：延迟双删 Redis 已发布笔记列表缓存
      */
     String TOPIC_DELAY_DELETE_PUBLISHED_NOTE_LIST_REDIS_CACHE = "DelayDeletePublishedNoteListRedisCacheTopic";

@@ -605,6 +605,7 @@ public class NoteServiceImpl implements NoteService {
             throw new BizException(ResponseCodeEnum.NOTE_UPDATE_FAIL);
         }
 
+        sendNoteOperateMq(selectNoteDO.getCreatorId(), noteId, NoteOperateEnum.UPDATE);
         return Response.success();
     }
 
@@ -729,12 +730,14 @@ public class NoteServiceImpl implements NoteService {
         rocketMQTemplate.syncSend(MQConstants.TOPIC_DELETE_NOTE_LOCAL_CACHE,noteId);
         log.info("====> MQ：删除笔记本地缓存发送成功...");
 
+        // 通知 AI 模块同步检索索引（笔记已转为仅自己可见，需要从索引中移除）
+        sendNoteOperateMq(selectNoteDO.getCreatorId(), noteId, NoteOperateEnum.UPDATE);
 
         return Response.success();
     }
 
     /*
-    * 笔记置顶
+     * 笔记置顶
     * */
     @Override
     public Response<?> topNote(TopNoteReqVO topNoteReqVO) {
@@ -813,6 +816,8 @@ public class NoteServiceImpl implements NoteService {
         //5.同步删除本地缓存中的笔记内容
         rocketMQTemplate.syncSend(MQConstants.TOPIC_DELETE_NOTE_LOCAL_CACHE, noteId);
         log.info("====> MQ：删除笔记本地缓存发送成功...");
+
+        sendNoteOperateMq(selectNoteDO.getCreatorId(), noteId, NoteOperateEnum.UPDATE);
 
         return Response.success();
     }
@@ -2092,4 +2097,44 @@ public class NoteServiceImpl implements NoteService {
 
     }
 
+
+    /**
+     * 发送笔记操作 MQ，供 AI 模块增量同步笔记检索索引
+     */
+    private void sendNoteOperateMq(Long creatorId, Long noteId, NoteOperateEnum operateEnum) {
+        try {
+            NoteOperateMqDTO noteOperateMqDTO = NoteOperateMqDTO.builder()
+                    .creatorId(creatorId)
+                    .noteId(noteId)
+                    .type(operateEnum.getCode())
+                    .build();
+            Message<String> message = MessageBuilder.withPayload(JsonUtils.toJsonString(noteOperateMqDTO)).build();
+            String destination = MQConstants.TOPIC_NOTE_OPERATE + ":" + tagOf(operateEnum);
+            rocketMQTemplate.asyncSend(destination, message, new SendCallback() {
+                @Override
+                public void onSuccess(SendResult sendResult) {
+                    log.info("==> 【笔记操作 {}】MQ 发送成功，SendResult: {}", operateEnum, sendResult);
+                }
+
+                @Override
+                public void onException(Throwable e) {
+                    log.error("==> 【笔记操作 {}】MQ 发送异常: ", operateEnum, e);
+                }
+            });
+        } catch (Exception e) {
+            // 索引同步失败不能影响笔记主流程，兜底交给 AI 模块的每日全量重建
+            log.error("## 发送笔记操作 MQ 失败, noteId: {}, type: {}", noteId, operateEnum, e);
+        }
+    }
+
+    /**
+     * 笔记操作枚举 -> MQ Tag
+     */
+    private String tagOf(NoteOperateEnum operateEnum) {
+        return switch (operateEnum) {
+            case PUBLISH -> MQConstants.TAG_NOTE_PUBLISH;
+            case DELETE -> MQConstants.TAG_NOTE_DELETE;
+            case UPDATE -> MQConstants.TAG_NOTE_UPDATE;
+        };
+    }
 }

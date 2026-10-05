@@ -8,6 +8,7 @@
                       :video-url="currNote.videoUri"
                       :poster="currNote.cover"
                       :autoplay="true"
+                      :loop="true"
                     ></VideoPlayer>
               <!-- 详情数据未到位：先用卡片上已加载的封面顶上，媒体区不空、展开动画也有连续图像 -->
               <img v-else-if="mediaKind === 'cover'" class="note-detail__hero" :src="optimisticCover" alt="" />
@@ -279,7 +280,8 @@
                     <!-- 发送按钮 -->
                     <button 
                       class="st-btn st-btn-primary w-[64px] h-10 text-[15px]"
-                      :class="{'opacity-50': !commentContent.trim() && !commentImage}"
+                      :class="{'opacity-50': (!commentContent.trim() && !commentImage) || isPublishingComment}"
+                      :disabled="isPublishingComment"
                       @click="handlePublishComment"
                     >
                       发送
@@ -442,6 +444,8 @@ const isLoggedIn = computed(() => !!userStore.token)
 const isInputFocused = ref(false)
 const commentInput = ref(null)
 const commentContent = ref('')
+// 评论发布中标记：防止连点产生重复评论
+const isPublishingComment = ref(false)
 
 // 添加回复对象状态
 const replyTo = ref(null)
@@ -698,6 +702,9 @@ const findParentComment = (commentId, commentsList) => {
 
 // 修改发布评论函数
 const handlePublishComment = async () => {
+  // 发布中，忽略重复点击
+  if (isPublishingComment.value) return
+
   
   // 检查是否有内容或图片
   if (!commentContent.value.trim() && !commentImage.value) {
@@ -705,6 +712,9 @@ const handlePublishComment = async () => {
     return
   }
   
+  // 标记发布中，避免连点重复提交
+  isPublishingComment.value = true
+
   // 发布评论前先申请幂等 Token，防止重复评论（申请失败自动降级为无 Token，后端灰度放行）
   const idempotentToken = await fetchIdempotentToken()
 
@@ -801,6 +811,8 @@ const handlePublishComment = async () => {
   }).catch(error => {
     console.error('发布评论失败:', error)
     message.show('评论失败，请稍后重试')
+  }).finally(() => {
+    isPublishingComment.value = false
   })
 }
 
