@@ -1,25 +1,5 @@
-<template>
+﻿<template>
   <div class="ai-page">
-    <header class="ai-head">
-      <div class="ai-head__text">
-        <h2 class="st-page-title">AI 助手</h2>
-        <p class="page-header__desc">
-          用一句话描述你想找什么，助手会检索全站已发布笔记、判断哪些真正对题，再把笔记内容整理后回答你。
-        </p>
-      </div>
-
-      <div class="ai-head__actions">
-        <button type="button" class="ai-chip-btn" @click="startNewChat">新建对话</button>
-        <button
-          type="button"
-          class="ai-chip-btn"
-          :class="{ 'ai-chip-btn--active': conversationsOpen }"
-          @click="conversationsOpen = !conversationsOpen"
-        >
-          历史对话
-        </button>
-      </div>
-    </header>
 
     <!-- 未登录：AI 接口需要登录态 -->
     <div v-if="!isLoggedIn" class="st-surface">
@@ -28,7 +8,14 @@
       </EmptyState>
     </div>
 
-    <div v-else class="ai-layout" :class="{ 'ai-layout--with-side': conversationsOpen }">
+    <div
+      v-else
+      class="ai-layout"
+      :class="{
+        'ai-layout--with-side': conversationsOpen,
+        'ai-layout--with-sources': sourcesPanelOpen
+      }"
+    >
       <!-- 历史会话 -->
       <aside v-if="conversationsOpen" class="ai-conversations st-surface">
         <div class="ai-conversations__head">
@@ -71,19 +58,6 @@
 
       <!-- 对话区 -->
       <section class="ai-chat st-surface">
-        <!-- 索引状态：索引为空时直接给出重建入口，避免用户以为「AI 坏了」 -->
-        <div class="ai-status">
-          <span class="ai-status__dot" :class="{ 'ai-status__dot--warn': indexStats.indexedNotes === 0 }"></span>
-          <span class="ai-status__text">
-            已索引 <b class="st-num">{{ indexStats.indexedNotes }}</b> 篇笔记 ·
-            <b class="st-num">{{ indexStats.vectors }}</b> 个片段
-          </span>
-          <span v-if="indexStats.indexedNotes === 0" class="ai-status__warn">索引为空，先重建一次才能检索</span>
-          <button type="button" class="ai-status__action" :disabled="rebuilding" @click="confirmRebuild = true">
-            {{ rebuilding ? '重建中…' : '重建索引' }}
-          </button>
-        </div>
-
         <div ref="scrollRef" class="ai-messages">
           <!-- 空态：给几个能直接点的提问示例 -->
           <div v-if="!messages.length" class="ai-welcome">
@@ -136,6 +110,10 @@
             </div>
 
             <div class="ai-msg__body">
+              <p v-if="msg.role === 'assistant' && msg.fromNotes === false" class="ai-msg__notice">
+                站内暂时没有检索到相关笔记，以下为 AI 直接回答
+              </p>
+
               <!-- 助手回答是 Markdown，渲染前已在 utils/aiMarkdown.js 里整体转义 -->
               <div
                 v-if="msg.role === 'assistant'"
@@ -146,19 +124,31 @@
               <p v-else class="ai-msg__content">{{ msg.content }}</p>
 
               <!-- 当前会话新产生的回答：带标题、话题、匹配度与判优理由 -->
-              <AiSourceList v-if="msg.notes?.length" :notes="msg.notes" @open="openNoteDetail" />
+              <AiSourceList v-if="msg.notes?.length" :notes="msg.notes" @open="openNoteDetail" @show-sources="openSourcesPanel($event, 'full')" />
 
-              <!-- 历史会话里只存了笔记 ID，退化成可点击的胶囊 -->
+              <!-- 历史会话里只存了笔记 ID，退化成可点击的胶囊；超过 2 篇时显示摘要 + 抽屉 -->
               <div v-else-if="msg.noteRefs?.length" class="ai-msg__refs">
-                <span class="ai-msg__refs-label">引用笔记</span>
-                <button
-                  v-for="noteId in msg.noteRefs"
-                  :key="noteId"
-                  type="button"
-                  class="ai-ref-chip"
-                  @click="openNoteDetail({ noteId })"
-                >
-                  笔记 {{ noteId }}
+                <template v-if="msg.noteRefs.length <= 2">
+                  <span class="ai-msg__refs-label">引用笔记</span>
+                  <button
+                    v-for="noteId in msg.noteRefs"
+                    :key="noteId"
+                    type="button"
+                    class="ai-ref-chip"
+                    @click="openNoteDetail({ noteId })"
+                  >
+                    笔记 {{ noteId }}
+                  </button>
+                </template>
+                <button v-else type="button" class="ai-sources__summary" @click="openSourcesPanel(msg.noteRefs, 'ids')">
+                  <svg class="ai-sources__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M6 4.5h9.5L19 8v11.5H6V4.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+                    <path d="M9 12h7M9 15.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                  AI 总结 {{ msg.noteRefs.length }} 篇笔记生成
+                  <svg class="ai-sources__arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
                 </button>
               </div>
 
@@ -208,13 +198,7 @@
           ></textarea>
 
           <div class="ai-composer__foot">
-            <label class="ai-composer__topn">
-              最多引用
-              <select v-model.number="topN" :disabled="pending">
-                <option v-for="value in [1, 2, 3, 5]" :key="value" :value="value">{{ value }}</option>
-              </select>
-              篇笔记
-            </label>
+            <p class="ai-composer__hint">检索全站已发布笔记并引用原文润色；站内没有相关笔记时由 AI 直接回答</p>
 
             <button type="button" class="st-btn st-btn-primary" :disabled="!canSend" @click="handleSend">
               {{ pending ? '生成中…' : '发送' }}
@@ -222,6 +206,59 @@
           </div>
         </div>
       </section>
+
+      <!-- 右侧来源笔记面板：内联展示，非浮窗 -->
+      <aside v-if="sourcesPanelOpen" class="ai-sources-panel st-surface">
+        <header class="ai-sources-panel__head">
+          <span>{{ sourcesPanelTitle }}</span>
+          <button type="button" class="ai-sources-panel__close" aria-label="关闭" @click="sourcesPanelOpen = false">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+            </svg>
+          </button>
+        </header>
+
+        <ul class="ai-sources-panel__list">
+          <!-- 完整笔记信息（当前会话新产生的回答） -->
+          <template v-if="sourcesPanelMode === 'full'">
+            <li v-for="(note, index) in sourcesPanelNotes" :key="note.noteId || index">
+              <button type="button" class="ai-source" @click="openNoteDetail(note)">
+                <span class="ai-source__index st-num" aria-hidden="true">{{ index + 1 }}</span>
+                <span class="ai-source__body">
+                  <span class="ai-source__title">{{ note.title || `笔记 ${note.noteId}` }}</span>
+                  <span class="ai-source__meta">
+                    <span v-if="note.topicName" class="ai-source__topic"># {{ note.topicName }}</span>
+                    <span v-if="note.judgeScore != null" class="ai-source__score">匹配度 {{ note.judgeScore }}%</span>
+                    <span v-else-if="note.score != null" class="ai-source__score">相似度 {{ Math.round(note.score * 100) }}%</span>
+                  </span>
+                  <span v-if="note.reason" class="ai-source__reason">{{ note.reason }}</span>
+                </span>
+                <svg class="ai-source__arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </li>
+          </template>
+
+          <!-- 仅笔记 ID（历史会话） -->
+          <template v-else>
+            <li v-for="(noteId, index) in sourcesPanelIds" :key="noteId">
+              <button type="button" class="ai-source" @click="openNoteDetail({ noteId })">
+                <span class="ai-source__index st-num" aria-hidden="true">{{ index + 1 }}</span>
+                <span class="ai-source__body">
+                  <span class="ai-source__title">笔记 {{ noteId }}</span>
+                  <span class="ai-source__meta">
+                    <span class="ai-source__topic">点击查看笔记详情</span>
+                  </span>
+                </span>
+                <svg class="ai-source__arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </li>
+          </template>
+        </ul>
+      </aside>
     </div>
 
     <!-- 笔记详情浮层：作为本页子路由渲染，关闭后仍停留在 AI 助手页 -->
@@ -248,9 +285,12 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'AiAssistant' })
 import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useAiStore } from '@/stores/ai'
+import { storeToRefs } from 'pinia'
 import { useNoteTransition } from '@/composables/noteTransition'
 import { renderAiMarkdown } from '@/utils/aiMarkdown'
 import { message } from '@/utils/message'
@@ -260,13 +300,15 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import defaultAvatar from '@/assets/avatar.png'
 
-const STAGES = ['正在检索全站笔记…', '正在判断哪些笔记真正对题…', '正在整理润色回答…']
+const STAGES = ['正在检索全站笔记…', '正在判断哪些笔记真正对题…', '正在整理回答…']
 const STAGE_INTERVAL = 1300
 const TYPE_INTERVAL = 16
 const TYPE_FRAMES = 140
 
 const route = useRoute()
 const userStore = useUserStore()
+const aiStore = useAiStore()
+const { conversationsOpen, rebuilding } = storeToRefs(aiStore)
 const { openNote } = useNoteTransition()
 const showLoginModal = inject('showLoginModal')
 
@@ -281,22 +323,29 @@ const examples = [
   '找几篇讲时间管理的笔记，要有可执行的方法'
 ]
 
-const conversationsOpen = ref(false)
 const chats = ref([])
 const chatLoading = ref(false)
 const chatUuid = ref('')
 
 const messages = ref([])
 const draft = ref('')
-const topN = ref(3)
 const pending = ref(false)
 const pendingStage = ref(STAGES[0])
 
 const indexStats = ref({ indexedNotes: 0, vectors: 0 })
-const rebuilding = ref(false)
 const confirmRebuild = ref(false)
 const confirmDeleteChat = ref(false)
 const chatToDelete = ref(null)
+
+// 右侧来源笔记面板（内联展示）
+const sourcesPanelOpen = ref(false)
+const sourcesPanelMode = ref('full') // 'full' = 完整笔记信息；'ids' = 仅笔记 ID
+const sourcesPanelNotes = ref([])
+const sourcesPanelIds = ref([])
+const sourcesPanelCount = computed(() =>
+  sourcesPanelMode.value === 'full' ? sourcesPanelNotes.value.length : sourcesPanelIds.value.length
+)
+const sourcesPanelTitle = computed(() => `来源笔记 · ${sourcesPanelCount.value} 篇`)
 
 const scrollRef = ref(null)
 
@@ -313,6 +362,18 @@ const scrollToBottom = () => {
 }
 
 watch(() => messages.value.length, scrollToBottom)
+
+watch(() => aiStore.rebuildTrigger, (n) => {
+  if (n > 0) confirmRebuild.value = true
+})
+
+watch(() => aiStore.newChatTrigger, (n) => {
+  if (n > 0) startNewChat()
+})
+
+watch(conversationsOpen, (open) => {
+  if (open && isLoggedIn.value) loadChats()
+})
 
 /* ------------------------------- 索引状态 ------------------------------- */
 
@@ -375,7 +436,12 @@ const openChat = (uuid) => {
       messages.value = (res.data || []).map((item) => ({
         role: item.role,
         content: item.content,
-        noteRefs: item.noteRefs || []
+        noteRefs: item.noteRefs || [],
+        // 历史消息没存 fromNotes，用「助手回答且无引用笔记」推断为直答兜底
+        fromNotes:
+          item.role === 'assistant' && !(item.noteRefs || []).length && !String(item.content || '').startsWith('[出错了]')
+            ? false
+            : undefined
       }))
       scrollToBottom()
     })
@@ -497,7 +563,7 @@ const handleSend = async () => {
   scrollToBottom()
 
   try {
-    const res = await chatWithAi(query, chatUuid.value || undefined, topN.value)
+    const res = await chatWithAi(query, chatUuid.value || undefined)
     if (!res?.success) {
       messages.value.push({ role: 'assistant', content: res?.message || 'AI 暂时不可用', failed: true })
       message.show(res?.message || 'AI 暂时不可用')
@@ -509,7 +575,13 @@ const handleSend = async () => {
 
     const answer = String(data.answer || '')
     const failed = answer.startsWith('[出错了]')
-    messages.value.push({ role: 'assistant', content: '', notes: data.notes || [], failed })
+    messages.value.push({
+      role: 'assistant',
+      content: '',
+      notes: data.notes || [],
+      fromNotes: data.fromNotes,
+      failed
+    })
 
     // 注意：必须拿 push 之后从数组里读出来的响应式代理，直接改原始对象不会触发重渲染，
     // 逐字显示会「静默」地跑完却看不到过程
@@ -519,7 +591,11 @@ const handleSend = async () => {
 
     if (conversationsOpen.value) loadChats()
   } catch (error) {
-    const msg = error?.response?.data?.message || '请求失败，请稍后重试'
+    // 超时可能是「模型还在思考」而不是真的失败：后端会把这条回答落库，稍后可在历史对话里看到
+    const timedOut = error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')
+    const msg = timedOut
+      ? 'AI 思考时间过长已中断，稍后可在历史对话里查看结果，或把问题问得更具体些'
+      : error?.response?.data?.message || '请求失败，请稍后重试'
     messages.value.push({ role: 'assistant', content: msg, failed: true })
   } finally {
     stopStages()
@@ -534,6 +610,21 @@ const openNoteDetail = (note) => {
   if (!noteId) return
   // 用统一的打开方式：笔记卡片没有封面时不会做飞行动画，直接淡入浮层
   openNote({ id: noteId }, { path: `${route.path}/note/${noteId}` })
+}
+
+// 打开右侧来源笔记面板
+// data: 笔记数组（当前会话）或笔记 ID 数组（历史会话）
+// mode: 'full' | 'ids'
+const openSourcesPanel = (data, mode) => {
+  sourcesPanelMode.value = mode
+  if (mode === 'full') {
+    sourcesPanelNotes.value = Array.isArray(data) ? data : []
+    sourcesPanelIds.value = []
+  } else {
+    sourcesPanelIds.value = Array.isArray(data) ? data : []
+    sourcesPanelNotes.value = []
+  }
+  sourcesPanelOpen.value = true
 }
 
 const copyAnswer = async (text) => {
@@ -573,49 +664,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.ai-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.ai-head__text {
-  min-width: 0;
-}
-
-.ai-head__actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.ai-chip-btn {
-  height: 32px;
-  padding: 0 14px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-soft);
-  font-size: 13px;
-  cursor: pointer;
-  transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard);
-}
-
-.ai-chip-btn:hover {
-  background: var(--color-canvas-deep);
-  color: var(--color-ink);
-}
-
-.ai-chip-btn--active {
-  background: var(--color-canvas-deep);
-  color: var(--color-ink);
-  font-weight: 500;
+  height: calc(100vh - var(--header-h) - 20px);
 }
 
 /* ------------------------------- 布局 ------------------------------- */
@@ -624,11 +673,23 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
 }
 
 .ai-layout--with-side {
   grid-template-columns: 260px minmax(0, 1fr);
+}
+
+/* 右侧来源笔记面板（无历史会话侧栏） */
+.ai-layout--with-sources {
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+/* 同时有历史会话侧栏 + 来源笔记面板 */
+.ai-layout--with-side.ai-layout--with-sources {
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
 }
 
 /* ----------------------------- 历史会话 ----------------------------- */
@@ -637,7 +698,8 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   padding: 14px 12px;
-  max-height: min(560px, calc(100vh - 340px));
+  height: 100%;
+  overflow: hidden;
 }
 
 .ai-conversations__head {
@@ -753,68 +815,23 @@ onBeforeUnmount(() => {
 .ai-chat {
   display: flex;
   flex-direction: column;
-  padding: 14px 18px 16px;
+  padding: 14px 16px 16px;
   min-width: 0;
-}
-
-.ai-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 2px 12px;
-  border-bottom: 1px solid var(--color-line);
-  font-size: 12px;
-  color: var(--color-ink-faint);
-}
-
-.ai-status__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: #00b96b;
-  flex-shrink: 0;
-}
-
-.ai-status__dot--warn {
-  background: var(--color-brand);
-}
-
-.ai-status__text b {
-  color: var(--color-ink-soft);
-  font-weight: 600;
-}
-
-.ai-status__warn {
-  color: var(--color-brand);
-}
-
-.ai-status__action {
-  margin-left: auto;
+  width: 100%;
+  max-width: 820px;
+  height: 100%;
+  margin: 0 auto;
+  overflow: hidden;
   border: none;
-  background: transparent;
-  color: var(--color-ink-faint);
-  font-size: 12px;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.ai-status__action:hover:not(:disabled) {
-  color: var(--color-ink);
-}
-
-.ai-status__action:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 
 .ai-messages {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  height: min(560px, calc(100vh - 380px));
-  min-height: 300px;
-  padding: 16px 2px 8px;
+  flex: 1;
+  min-height: 120px;
+  padding: 16px 5px 8px;
   overflow-y: auto;
 }
 
@@ -938,7 +955,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: flex-start;
   min-width: 0;
-  max-width: min(720px, 82%);
+  max-width: min(720px, 100%);
 }
 
 .ai-msg--user .ai-msg__body {
@@ -947,7 +964,7 @@ onBeforeUnmount(() => {
 }
 
 .ai-msg--assistant .ai-msg__body {
-  width: min(720px, 82%);
+  max-width: min(720px, 100%);
 }
 
 .ai-msg__content {
@@ -960,13 +977,14 @@ onBeforeUnmount(() => {
 }
 
 .ai-msg--assistant .ai-msg__content {
-  background: var(--color-canvas-sunken);
+  background: transparent;
   color: var(--color-ink);
+  padding: 11px 4px;
 }
 
 .ai-msg--user .ai-msg__content {
-  background: var(--color-brand);
-  color: #fff;
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
   white-space: pre-wrap;
 }
 
@@ -1198,34 +1216,46 @@ onBeforeUnmount(() => {
   margin-top: 8px;
 }
 
-.ai-composer__topn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.ai-composer__hint {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
+  line-height: 1.6;
   color: var(--color-ink-faint);
 }
 
-.ai-composer__topn select {
-  padding: 4px 8px;
-  border: none;
-  border-radius: var(--radius-pill);
+.ai-msg__notice {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-control);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-soft);
   font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
+  line-height: 1.6;
 }
 
 /* ------------------------------ 响应式 ------------------------------ */
 
+@media (max-width: 1023px) {
+  .ai-page {
+    height: calc(100vh - var(--header-h) - 16px);
+  }
+}
+
 @media (max-width: 1100px) {
-  .ai-layout--with-side {
+  .ai-layout--with-side,
+  .ai-layout--with-sources,
+  .ai-layout--with-side.ai-layout--with-sources {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .ai-conversations {
-    max-height: 220px;
+    height: 220px;
+  }
+
+  .ai-sources-panel {
+    height: 320px;
   }
 
   .ai-msg__body,
@@ -1236,12 +1266,8 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 767px) {
-  .ai-head {
-    flex-direction: column;
-  }
-
-  .ai-messages {
-    height: min(520px, calc(100vh - 400px));
+  .ai-page {
+    height: calc(100vh - var(--header-h) - 12px);
   }
 
   .ai-msg__body,
@@ -1249,4 +1275,187 @@ onBeforeUnmount(() => {
     max-width: 92%;
   }
 }
-</style>
+
+/* ----------------------- 摘要按钮 & 抽屉（复用 AiSourceList 样式） ----------------------- */
+
+.ai-sources__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 6px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-soft);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.ai-sources__summary:hover {
+  border-color: var(--color-line-strong);
+  background: var(--color-canvas-deep);
+  color: var(--color-ink);
+}
+
+.ai-sources__summary .ai-sources__icon {
+  width: 15px;
+  height: 15px;
+  color: var(--color-brand);
+}
+
+.ai-sources__summary .ai-sources__arrow {
+  width: 14px;
+  height: 14px;
+  color: var(--color-ink-faint);
+}
+
+/* ------------------------------ 右侧来源笔记面板 ------------------------------ */
+
+.ai-sources-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ai-sources-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-line);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.ai-sources-panel__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+
+.ai-sources-panel__close:hover {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+}
+
+.ai-sources-panel__close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ai-sources-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  margin: 0;
+  padding: 14px 16px 20px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+/* 右侧面板内 .ai-source 系列样式（AiSourceList.vue 的 scoped 样式不会泄漏到本面板） */
+.ai-source {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+.ai-source:hover {
+  border-color: var(--color-line-strong);
+  background: var(--color-canvas-deep);
+}
+
+.ai-source__index {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: var(--radius-pill);
+  background: var(--color-paper);
+  color: var(--color-ink-soft);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.ai-source__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ai-source__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.ai-source__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.ai-source__topic {
+  color: var(--color-ink-soft);
+}
+
+.ai-source__score {
+  color: var(--color-brand);
+}
+
+.ai-source__reason {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* 箭头尺寸受控 */
+.ai-source__arrow {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+}</style>

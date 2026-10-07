@@ -30,4 +30,9 @@ public class AssistantSearchRspVO {
      * 会话 UUID（仅对话接口返回）
      */
     private String chatUuid;
+
+    /**
+     * 是否基于站内笔记回答：false 表示站内没有检索到相关笔记，走了 AI 直答兜底
+     */
+    private Boolean fromNotes;
 }

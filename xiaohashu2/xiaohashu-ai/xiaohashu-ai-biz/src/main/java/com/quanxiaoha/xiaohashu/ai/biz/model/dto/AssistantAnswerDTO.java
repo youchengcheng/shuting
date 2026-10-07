@@ -26,4 +26,9 @@ public class AssistantAnswerDTO {
      * 引用到的笔记
      */
     private List<NoteRefVO> notes;
+
+    /**
+     * 是否基于站内笔记回答：false 表示站内没有检索到相关笔记，走了 AI 直答兜底
+     */
+    private Boolean fromNotes;
 }

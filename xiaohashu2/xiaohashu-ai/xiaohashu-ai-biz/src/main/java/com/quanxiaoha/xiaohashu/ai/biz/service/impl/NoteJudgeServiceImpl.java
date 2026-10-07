@@ -15,6 +15,7 @@ import com.quanxiaoha.xiaohashu.ai.biz.util.AiStringUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -23,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 /**
@@ -38,28 +40,37 @@ public class NoteJudgeServiceImpl implements NoteJudgeService {
     @Resource
     private AiProperties aiProperties;
 
+    @Resource(name = "aiTaskExecutor")
+    private ThreadPoolTaskExecutor aiTaskExecutor;
+
     @Override
-    public List<NoteCandidateDTO> judge(String query, List<NoteCandidateDTO> candidates, int topN) {
+    public List<NoteCandidateDTO> judge(String query, List<NoteCandidateDTO> candidates) {
         if (CollUtil.isEmpty(candidates)) {
             return Collections.emptyList();
         }
         int batchSize = Math.max(1, aiProperties.getJudgeBatchSize());
-        List<NoteCandidateDTO> scored = new ArrayList<>(candidates.size());
+
+        // 分批并行调用大模型：候选多时串行会累计十几秒，并行后整体耗时≈最慢的一批
+        List<Future<List<NoteCandidateDTO>>> futures = new ArrayList<>();
         for (int i = 0; i < candidates.size(); i += batchSize) {
-            List<NoteCandidateDTO> batch = candidates.subList(i, Math.min(i + batchSize, candidates.size()));
+            List<NoteCandidateDTO> batch = new ArrayList<>(candidates.subList(i, Math.min(i + batchSize, candidates.size())));
+            futures.add(aiTaskExecutor.submit(() -> judgeBatch(query, batch)));
+        }
+
+        List<NoteCandidateDTO> scored = new ArrayList<>(candidates.size());
+        for (Future<List<NoteCandidateDTO>> future : futures) {
             try {
-                scored.addAll(judgeBatch(query, batch));
+                scored.addAll(future.get());
             } catch (Exception e) {
-                log.error("## 笔记判优批次失败, batchSize: {}", batch.size(), e);
+                log.error("## 笔记判优批次失败", e);
             }
         }
 
         int threshold = aiProperties.getJudgeThreshold();
-        int limit = topN > 0 ? topN : aiProperties.getJudgeTopN();
+        // 不做篇数截断：达到阈值就全部返回，交给润色阶段统一整理
         return scored.stream()
                 .filter(item -> item.getJudgeScore() != null && item.getJudgeScore() >= threshold)
                 .sorted(Comparator.comparing(NoteCandidateDTO::getJudgeScore).reversed())
-                .limit(limit)
                 .collect(Collectors.toList());
     }
 
@@ -93,11 +104,43 @@ public class NoteJudgeServiceImpl implements NoteJudgeService {
             NoteCandidateDTO candidate = batch.get(i);
             sb.append("【候选").append(i + 1).append("】noteId=").append(candidate.getNoteId()).append('\n');
             sb.append("标题：").append(AiStringUtils.isBlank(candidate.getTitle()) ? "无标题" : candidate.getTitle()).append('\n');
-            sb.append("片段：")
+            // 话题名提供分类语义，帮助模型快速判断相关性
+            if (AiStringUtils.isNotBlank(candidate.getTopicName())) {
+                sb.append("话题：").append(candidate.getTopicName()).append('\n');
+            }
+            // 除最佳片段外，附带第2高分片段，避免单片段信息不全导致误判
+            String secondChunk = pickSecondChunk(candidate);
+            sb.append("片段1：")
                     .append(AiStringUtils.truncate(candidate.getBestChunk(), AiConstants.JUDGE_CHUNK_MAX_CHARS))
-                    .append("\n\n");
+                    .append('\n');
+            if (secondChunk != null) {
+                sb.append("片段2：")
+                        .append(AiStringUtils.truncate(secondChunk, AiConstants.JUDGE_CHUNK_MAX_CHARS))
+                        .append('\n');
+            }
+            sb.append('\n');
         }
         return sb.toString();
+    }
+
+    /**
+     * 从候选笔记的所有命中片段中挑出「第二高分」的片段，作为判优补充上下文。
+     * <p>bestChunk 只保留了最高分片段，但单片段可能恰好不包含用户关注的关键词，
+     * 附一个次高片段能显著降低误判概率。</p>
+     */
+    private String pickSecondChunk(NoteCandidateDTO candidate) {
+        List<String> chunks = candidate.getChunks();
+        if (CollUtil.isEmpty(chunks) || chunks.size() < 2) {
+            return null;
+        }
+        // chunks 按召回顺序排列，bestChunk 是其中最高分的，其余取第一个不等于 bestChunk 的
+        String best = candidate.getBestChunk();
+        for (String chunk : chunks) {
+            if (!chunk.equals(best)) {
+                return chunk;
+            }
+        }
+        return null;
     }
 
     /**

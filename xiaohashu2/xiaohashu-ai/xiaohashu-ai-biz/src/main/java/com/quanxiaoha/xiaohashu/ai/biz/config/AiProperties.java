@@ -21,33 +21,41 @@ public class AiProperties {
 
     /**
      * 向量召回阶段返回的 chunk 数量（注意是 chunk 不是笔记）
+     * <p>从 40 降到 20：减少向量库扫描量和聚合开销。</p>
      */
-    private int recallTopK = 40;
+    private int recallTopK = 20;
 
     /**
      * 召回结果按 noteId 聚合后，最多保留多少篇笔记进入判优阶段
+     * <p>从 20 降到 12：减少送入大模型判优的笔记数量，加快响应。</p>
      */
-    private int recallNoteLimit = 20;
+    private int recallNoteLimit = 12;
 
     /**
      * 向量召回相似度下限（COSINE 距离下 0~1，越大越严格）
+     * <p>从 0.25 提到 0.45：过滤掉明显不相关的噪声笔记，减少判优压力。</p>
      */
-    private double recallSimilarityThreshold = 0.25;
+    private double recallSimilarityThreshold = 0.45;
 
     /**
      * 大模型判优的通过阈值（0~100 分）
+     * <p>从 60 提到 70：只保留真正相关的笔记，弱相关不再混入。</p>
      */
-    private int judgeThreshold = 60;
-
-    /**
-     * 判优通过后，最多取前 N 篇笔记做润色
-     */
-    private int judgeTopN = 3;
+    private int judgeThreshold = 70;
 
     /**
      * 判优阶段单次送入模型的候选笔记数量（分批调用，避免 prompt 过长）
+     * <p>从 8 提到 12：减少 LLM 调用批次，12 篇候选只需 1 次调用。</p>
      */
-    private int judgeBatchSize = 8;
+    private int judgeBatchSize = 12;
+
+    /**
+     * 润色阶段送入模型的笔记正文总字符数上限
+     *
+     * <p>判优达标的笔记会「全量」参与润色，这里只做上下文长度的兜底保护，
+     * 不限制引用笔记篇数。</p>
+     */
+    private int polishMaxInputChars = 24000;
 
     /**
      * 润色结果最大字符数

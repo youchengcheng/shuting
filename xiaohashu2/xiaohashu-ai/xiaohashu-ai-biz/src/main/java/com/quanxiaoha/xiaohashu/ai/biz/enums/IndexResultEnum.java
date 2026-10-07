@@ -13,6 +13,7 @@ public enum IndexResultEnum {
     FAILED(0, "建索引失败"),
     INDEXED(1, "已建索引"),
     SKIPPED(2, "内容未变化或不可检索，已跳过"),
+    NOT_READY(3, "笔记元数据尚未可见，待重试"),
     ;
 
     private final Integer code;

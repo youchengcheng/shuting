@@ -40,7 +40,7 @@
           </svg>
         </span>
         <span class="nav-item__label">
-          AI 助手
+          多多
           <sup class="nav-item__badge">ai</sup>
         </span>
       </button>

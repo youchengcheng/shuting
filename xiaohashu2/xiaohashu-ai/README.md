@@ -40,16 +40,28 @@ Cassandra note_content ─┘                                   +
 检索走三级流水线：
 
 1. **召回（向量）**：用户提问向量化后，从 pgvector 召回 topK 个 chunk（默认 40），按 noteId 聚合取 20 篇，回 MySQL 校验可见性。
-2. **判优（大模型）**：把候选笔记片段批量送给 LLM 打分（0~100），过滤掉低于阈值（默认 60）的，按分数排序取 top 3。
+2. **判优（大模型）**：把候选笔记片段按 `judge-batch-size`（默认 8）分批、**并行**送给 LLM 打分（0~100），
+   过滤掉低于阈值（默认 60）的，按分数排序。并行后整体耗时≈最慢的一批，避免候选多时串行累计十几秒。
 3. **润色（大模型）**：对判优通过的笔记，用 `contentUuid` 回 Cassandra 取**全文**，交给 LLM 整理润色，标注「来源：《标题》」。
+
+> 引用笔记**不做篇数上限**（前端也没有「最多引用几篇」选项）：只要判优达标就全部参与润色，
+> 仅用 `xiaohashu.ai.polish-max-input-chars`（默认 24000 字符）做上下文长度的兜底保护。
+
+**检索不到时的兜底**：整条流水线（召回为空 / 判优全部不达标 / 向量库暂时不可用）不会直接报错，
+而是降级为「通用 AI 助手直答」——先说明站内没有检索到相关笔记，再直接回答用户问题，
+且禁止虚构站内笔记。响应里的 `fromNotes=false` 即表示走了这条兜底路径。
 
 ## 3. 索引怎么保持和笔记数据一致
 
 - **增量（主）**：note 服务在「发布 / 更新 / 删除 / 修改可见性」时发 `NoteOperateTopic` 消息
   （Tag：`publishNote` / `updateNote` / `deleteNote`），本模块的 `NoteIndexSyncConsumer` 消费后
   重建或删除该笔记索引；内容 MD5 未变则自动跳过，不重复烧 embedding 额度。
-- **全量（兜底）**：`POST /ai/assistant/index/rebuild` 手动触发；
-  或配置 `xiaohashu.ai.index.rebuild-enabled=true` 开启每日定时重建；或 `rebuild-on-startup=true` 启动时重建。
+  > note 模块是在数据库事务提交前异步发 MQ，消费者可能先到一步导致笔记元数据查不到；
+  > 消费者会短暂重试（5 次 × 300ms），避免刚发布的笔记漏建索引。
+- **启动增量补齐（默认开启）**：`xiaohashu.ai.index.rebuild-on-startup=true`，应用启动后异步扫描
+  全站可检索笔记，把「还没进向量库 / 内容变了」的补上（内容未变直接跳过，开销很小）。
+- **手动 / 定时全量（可选兜底）**：`POST /ai/assistant/index/rebuild` 手动触发；
+  或配置 `xiaohashu.ai.index.rebuild-enabled=true` 开启每日定时重建。
 
 ## 4. 接口一览
 

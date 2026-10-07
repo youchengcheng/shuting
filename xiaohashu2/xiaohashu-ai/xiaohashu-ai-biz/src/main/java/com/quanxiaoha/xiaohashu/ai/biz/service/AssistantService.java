@@ -14,18 +14,17 @@ public interface AssistantService {
      * 完整回答（同步）
      *
      * @param query        用户需求
-     * @param topN         最多引用几篇笔记
      * @param extraContext 额外上下文（例如多轮对话历史），可为 null
      */
-    AssistantAnswerDTO answer(String query, Integer topN, String extraContext);
+    AssistantAnswerDTO answer(String query, String extraContext);
 
     /**
      * 完整回答（流式）：召回 + 判优同步完成，润色过程流式返回
      */
-    Flux<String> answerStream(String query, Integer topN, String extraContext);
+    Flux<String> answerStream(String query, String extraContext);
 
     /**
      * 只做召回 + 判优，返回命中笔记（供上层做二次加工）
      */
-    AssistantAnswerDTO retrieve(String query, Integer topN);
+    AssistantAnswerDTO retrieve(String query);
 }

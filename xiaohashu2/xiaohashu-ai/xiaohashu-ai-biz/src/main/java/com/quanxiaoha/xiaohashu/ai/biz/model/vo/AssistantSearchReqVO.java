@@ -16,9 +16,4 @@ public class AssistantSearchReqVO {
     @NotBlank(message = "提问内容不能为空")
     @Size(max = 500, message = "提问内容不能超过 500 字")
     private String query;
-
-    /**
-     * 最多返回几篇笔记，不传用配置默认值
-     */
-    private Integer topN;
 }
