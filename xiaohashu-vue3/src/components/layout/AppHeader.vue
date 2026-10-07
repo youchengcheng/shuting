@@ -1,4 +1,4 @@
-<template>
+﻿﻿﻿<template>
   <header class="app-header">
     <div class="app-header__inner">
       <!-- 品牌 -->
@@ -40,10 +40,23 @@
             />
           </svg>
         </button>
-      </form>
-
-      <!-- 右侧：账号 -->
+      </form>      <!-- 右侧：AI 助手快捷操作 + 账号 -->
       <div class="actions">
+        <div v-if="isAiPage" class="ai-actions">
+          <button type="button" class="ai-chip-btn" :disabled="aiStore.rebuilding" @click="aiStore.triggerRebuild()">
+            {{ aiStore.rebuilding ? '重建索引中…' : '重建索引' }}
+          </button>
+          <button type="button" class="ai-chip-btn" @click="aiStore.triggerNewChat()">新建对话</button>
+          <button
+            type="button"
+            class="ai-chip-btn"
+            :class="{ 'ai-chip-btn--active': aiStore.conversationsOpen }"
+            @click="aiStore.toggleConversations()"
+          >
+            历史对话
+          </button>
+        </div>
+
         <div v-if="isLoggedIn" class="account" ref="accountRef">
           <button
             type="button"
@@ -82,6 +95,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useAiStore } from '@/stores/ai'
 import BrandLogo from '@/components/common/BrandLogo.vue'
 import { logout } from '@/api/auth'
 import { message } from '@/utils/message'
@@ -90,12 +104,15 @@ import defaultAvatar from '@/assets/avatar.png'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const aiStore = useAiStore()
 
 const showLoginModal = inject('showLoginModal')
 
 const searchKeyword = ref(route.query.keyword || '')
 const menuOpen = ref(false)
 const accountRef = ref(null)
+
+const isAiPage = computed(() => route.path.startsWith('/ai'))
 
 const isLoggedIn = computed(() => !!userStore.token)
 const profile = computed(() => userStore.profile || {})
@@ -194,22 +211,60 @@ onBeforeUnmount(() => {
   align-items: center;
   flex: 1 1 auto;
   width: 100%;
-  max-width: 600px;
-  height: 44px;
+  max-width: 720px;
+  height: 54px;
   margin: 0 auto;
   padding: 0 6px 0 20px;
-  border: 1px solid transparent;
+  border: none;
   border-radius: var(--radius-pill);
   background: var(--color-canvas-sunken);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 2px 6px rgb(0 0 0 / 0.06),
+    0 8px 20px rgb(0 0 0 / 0.08);
   transition:
     background-color var(--motion-fast) var(--ease-standard),
-    border-color var(--motion-fast) var(--ease-standard);
+    box-shadow var(--motion-fast) var(--ease-standard);
 }
 
 .search:focus-within {
   background: var(--color-paper);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.05),
+    0 4px 10px rgb(0 0 0 / 0.08),
+    0 14px 32px rgb(0 0 0 / 0.12);
   border-color: var(--color-line-strong);
 }
+
+/* .search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 720px;
+  height: 52px;
+  margin: 0 auto;
+  padding: 0 8px 0 24px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-paper);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 4px 10px rgb(0 0 0 / 0.05),
+    0 16px 40px rgb(0 0 0 / 0.09);
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.search:focus-within {
+  background: var(--color-paper);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.05),
+    0 8px 18px rgb(0 0 0 / 0.07),
+    0 28px 70px rgb(0 0 0 / 0.15);
+} */
 
 .search__input {
   flex: 1;
@@ -273,6 +328,42 @@ onBeforeUnmount(() => {
   height: 20px;
 }
 
+.ai-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ai-chip-btn {
+  height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-soft);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.ai-chip-btn:hover {
+  background: var(--color-canvas-deep);
+  color: var(--color-ink);
+}
+
+.ai-chip-btn--active {
+  background: var(--color-canvas-deep);
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.ai-chip-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 .actions {
   display: flex;
   align-items: center;
@@ -398,6 +489,10 @@ onBeforeUnmount(() => {
   .app-header__inner {
     gap: 16px;
     padding: 0 18px;
+  }
+
+  .ai-actions {
+    display: none;
   }
 
   .actions {

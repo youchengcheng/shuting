@@ -57,17 +57,46 @@ public class NotePolishServiceImpl implements NotePolishService {
                 .content();
     }
 
+    @Override
+    public String answerDirectly(String query) {
+        String content = chatClient.prompt()
+                .system(NotePrompts.DIRECT_SYSTEM)
+                .user(NotePrompts.buildDirectUserPrompt(query))
+                .call()
+                .content();
+        if (AiStringUtils.isBlank(content)) {
+            throw new BizException(ResponseCodeEnum.AI_SERVICE_ERROR);
+        }
+        return AiStringUtils.truncate(content, aiProperties.getPolishMaxChars() * 4);
+    }
+
+    @Override
+    public Flux<String> answerDirectlyStream(String query) {
+        return chatClient.prompt()
+                .system(NotePrompts.DIRECT_SYSTEM)
+                .user(NotePrompts.buildDirectUserPrompt(query))
+                .stream()
+                .content();
+    }
+
     private String buildNotesText(List<NoteCandidateDTO> notes) {
-        int maxChars = Math.max(500, aiProperties.getNoteMaxContentChars());
+        int perNoteMax = Math.max(500, aiProperties.getNoteMaxContentChars());
+        int totalBudget = Math.max(perNoteMax, aiProperties.getPolishMaxInputChars());
         StringBuilder sb = new StringBuilder();
+        int used = 0;
         for (int i = 0; i < notes.size(); i++) {
             NoteCandidateDTO note = notes.get(i);
-            sb.append("【笔记").append(i + 1).append("】ID: ").append(note.getNoteId())
-                    .append("  标题：").append(AiStringUtils.isBlank(note.getTitle()) ? "无标题" : note.getTitle())
-                    .append('\n');
-            sb.append("正文：\n")
-                    .append(AiStringUtils.truncate(note.getContent(), maxChars))
-                    .append("\n\n");
+            int remaining = totalBudget - used;
+            if (remaining <= 200) {
+                log.info("## 润色输入已达长度上限，剩余 {} 篇笔记不再展开", notes.size() - i);
+                break;
+            }
+            String content = AiStringUtils.truncate(note.getContent(), Math.min(perNoteMax, remaining));
+            String block = "【笔记" + (i + 1) + "】ID: " + note.getNoteId()
+                    + "  标题：" + (AiStringUtils.isBlank(note.getTitle()) ? "无标题" : note.getTitle())
+                    + "\n正文：\n" + content + "\n\n";
+            sb.append(block);
+            used += block.length();
         }
         return sb.toString();
     }

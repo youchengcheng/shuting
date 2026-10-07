@@ -6,12 +6,14 @@
       <AppSidebar />
 
       <main class="app-main">
-        <div class="app-container">
+        <div class="app-container" :class="{ 'app-container--flush-bottom': isAiPage }">
           <!-- 页面切换：out-in 避免两个页面同时存在；不带 key，打开笔记详情浮层
               时底层页面仍是同一个组件实例，不会被重新挂载 -->
           <router-view v-slot="{ Component }">
             <Transition name="page-swap" mode="out-in">
-              <component :is="Component" />
+              <keep-alive :include="['AiAssistant']">
+                <component :is="Component" />
+              </keep-alive>
             </Transition>
           </router-view>
         </div>
@@ -23,6 +25,11 @@
 <script setup>
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
+import { useRoute } from 'vue-router'
+import { computed } from 'vue'
+
+const route = useRoute()
+const isAiPage = computed(() => route.path.startsWith('/ai'))
 </script>
 
 <style scoped>
@@ -43,6 +50,10 @@ import AppSidebar from '@/components/layout/AppSidebar.vue'
   padding: 20px 24px 72px;
 }
 
+.app-container--flush-bottom {
+  padding-bottom: 0;
+}
+
 @media (min-width: 1536px) {
   .app-container {
     padding-left: 32px;
@@ -58,11 +69,19 @@ import AppSidebar from '@/components/layout/AppSidebar.vue'
   .app-container {
     padding: 16px 20px 64px;
   }
+
+  .app-container--flush-bottom {
+    padding-bottom: 0;
+  }
 }
 
 @media (max-width: 767px) {
   .app-container {
     padding: 12px 16px 56px;
+  }
+
+  .app-container--flush-bottom {
+    padding-bottom: 0;
   }
 }
 </style>

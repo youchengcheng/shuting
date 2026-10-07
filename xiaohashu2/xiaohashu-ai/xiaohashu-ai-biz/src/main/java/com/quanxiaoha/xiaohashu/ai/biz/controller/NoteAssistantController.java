@@ -46,10 +46,11 @@ public class NoteAssistantController {
     @PostMapping("/search")
     @ApiOperationLog(description = "AI 检索笔记")
     public Response<AssistantSearchRspVO> search(@Validated @RequestBody AssistantSearchReqVO reqVO) {
-        AssistantAnswerDTO answer = assistantService.answer(reqVO.getQuery(), reqVO.getTopN(), null);
+        AssistantAnswerDTO answer = assistantService.answer(reqVO.getQuery(), null);
         return Response.success(AssistantSearchRspVO.builder()
                 .answer(answer.getAnswer())
                 .notes(answer.getNotes())
+                .fromNotes(answer.getFromNotes())
                 .build());
     }
 
@@ -62,7 +63,7 @@ public class NoteAssistantController {
             if (reqVO == null || AiStringUtils.isBlank(reqVO.getQuery())) {
                 return Flux.just("[出错了] 提问内容不能为空");
             }
-            return assistantService.answerStream(reqVO.getQuery(), reqVO.getTopN(), null)
+            return assistantService.answerStream(reqVO.getQuery(), null)
                     .onErrorResume(e -> Flux.just("[出错了] " + AiExceptionUtils.resolveMessage(e)));
         } catch (Exception e) {
             log.warn("## AI 检索流式接口异常", e);
@@ -76,9 +77,10 @@ public class NoteAssistantController {
     @PostMapping("/related")
     @ApiOperationLog(description = "AI 检索相关笔记")
     public Response<AssistantSearchRspVO> related(@Validated @RequestBody AssistantSearchReqVO reqVO) {
-        AssistantAnswerDTO answer = assistantService.retrieve(reqVO.getQuery(), reqVO.getTopN());
+        AssistantAnswerDTO answer = assistantService.retrieve(reqVO.getQuery());
         return Response.success(AssistantSearchRspVO.builder()
                 .notes(answer.getNotes())
+                .fromNotes(answer.getFromNotes())
                 .build());
     }
 

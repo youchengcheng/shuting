@@ -18,9 +18,4 @@ public class ChatReqVO {
     @NotBlank(message = "提问内容不能为空")
     @Size(max = 500, message = "提问内容不能超过 500 字")
     private String query;
-
-    /**
-     * 最多引用几篇笔记
-     */
-    private Integer topN;
 }

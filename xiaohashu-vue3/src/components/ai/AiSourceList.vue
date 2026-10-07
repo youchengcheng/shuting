@@ -1,46 +1,68 @@
 <template>
   <div class="ai-sources">
-    <p class="ai-sources__head">
-      <svg class="ai-sources__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path
-          d="M6 4.5h9.5L19 8v11.5H6V4.5Z"
-          stroke="currentColor"
-          stroke-width="1.6"
-          stroke-linejoin="round"
-        />
-        <path d="M9 12h7M9 15.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-      </svg>
-      引用笔记 · {{ notes.length }} 篇
-    </p>
+    <!-- 笔记数 > 2：显示摘要，点击后通知父组件在右侧面板展示全部笔记 -->
+    <template v-if="notes.length > 2">
+      <button type="button" class="ai-sources__summary" @click="emit('show-sources', notes)">
+        <svg class="ai-sources__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M6 4.5h9.5L19 8v11.5H6V4.5Z"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linejoin="round"
+          />
+          <path d="M9 12h7M9 15.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+        AI 总结 {{ notes.length }} 篇笔记生成
+        <svg class="ai-sources__arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </template>
 
-    <ul class="ai-sources__list">
-      <li v-for="(note, index) in notes" :key="note.noteId || index">
-        <button type="button" class="ai-source" @click="$emit('open', note)">
-          <span class="ai-source__index st-num" aria-hidden="true">{{ index + 1 }}</span>
+    <!-- 笔记数 <= 2：直接内联展示 -->
+    <template v-else>
+      <p class="ai-sources__head">
+        <svg class="ai-sources__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M6 4.5h9.5L19 8v11.5H6V4.5Z"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linejoin="round"
+          />
+          <path d="M9 12h7M9 15.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+        来源笔记 · {{ notes.length }} 篇
+      </p>
 
-          <span class="ai-source__body">
-            <span class="ai-source__title">{{ note.title || `笔记 ${note.noteId}` }}</span>
+      <ul class="ai-sources__list">
+        <li v-for="(note, index) in notes" :key="note.noteId || index">
+          <button type="button" class="ai-source" @click="$emit('open', note)">
+            <span class="ai-source__index st-num" aria-hidden="true">{{ index + 1 }}</span>
 
-            <span class="ai-source__meta">
-              <span v-if="note.topicName" class="ai-source__topic"># {{ note.topicName }}</span>
-              <span v-if="matchLabel(note)" class="ai-source__score">{{ matchLabel(note) }}</span>
+            <span class="ai-source__body">
+              <span class="ai-source__title">{{ note.title || `笔记 ${note.noteId}` }}</span>
+
+              <span class="ai-source__meta">
+                <span v-if="note.topicName" class="ai-source__topic"># {{ note.topicName }}</span>
+                <span v-if="matchLabel(note)" class="ai-source__score">{{ matchLabel(note) }}</span>
+              </span>
+
+              <span v-if="note.reason" class="ai-source__reason">{{ note.reason }}</span>
             </span>
 
-            <span v-if="note.reason" class="ai-source__reason">{{ note.reason }}</span>
-          </span>
-
-          <svg class="ai-source__arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M9 6l6 6-6 6"
-              stroke="currentColor"
-              stroke-width="1.7"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
-      </li>
-    </ul>
+            <svg class="ai-source__arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M9 6l6 6-6 6"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </li>
+      </ul>
+    </template>
   </div>
 </template>
 
@@ -53,7 +75,7 @@ defineProps({
   }
 })
 
-defineEmits(['open'])
+const emit = defineEmits(['open', 'show-sources'])
 
 const matchLabel = (note) => {
   if (note?.judgeScore != null) return `匹配度 ${note.judgeScore}%`
@@ -81,6 +103,40 @@ const matchLabel = (note) => {
 .ai-sources__icon {
   width: 15px;
   height: 15px;
+}
+
+/* 摘要按钮（笔记数 > 2 时） */
+.ai-sources__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 6px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-soft);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.ai-sources__summary:hover {
+  border-color: var(--color-line-strong);
+  background: var(--color-canvas-deep);
+  color: var(--color-ink);
+}
+
+.ai-sources__summary .ai-sources__icon {
+  color: var(--color-brand);
+}
+
+.ai-sources__summary .ai-sources__arrow {
+  width: 14px;
+  height: 14px;
+  color: var(--color-ink-faint);
 }
 
 .ai-sources__list {

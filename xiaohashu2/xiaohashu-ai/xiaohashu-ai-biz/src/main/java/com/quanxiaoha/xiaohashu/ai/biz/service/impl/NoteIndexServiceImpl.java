@@ -79,8 +79,14 @@ public class NoteIndexServiceImpl implements NoteIndexService {
 
         try {
             NoteMetaDO meta = noteMetaMapper.selectById(noteId);
+            if (meta == null) {
+                // 发布 / 更新的 MQ 是在数据库事务提交前异步发出的，消费者可能先到一步，
+                // 此时笔记元数据还查不到，返回 NOT_READY 交给调用方稍后重试，不能当成已删除
+                log.info("## 笔记元数据暂不可见，待重试, noteId: {}", noteId);
+                return IndexResultEnum.NOT_READY;
+            }
             if (!isIndexable(meta)) {
-                // 笔记已删除 / 下架 / 转私密 / 无正文，顺手把历史索引清掉
+                // 笔记已下架 / 转私密 / 无正文，顺手把历史索引清掉
                 deleteNote(noteId);
                 return IndexResultEnum.SKIPPED;
             }
@@ -178,7 +184,7 @@ public class NoteIndexServiceImpl implements NoteIndexService {
                     IndexResultEnum result = future.get();
                     if (result == IndexResultEnum.INDEXED) {
                         indexed++;
-                    } else if (result == IndexResultEnum.SKIPPED) {
+                    } else if (result == IndexResultEnum.SKIPPED || result == IndexResultEnum.NOT_READY) {
                         skipped++;
                     } else {
                         failed++;

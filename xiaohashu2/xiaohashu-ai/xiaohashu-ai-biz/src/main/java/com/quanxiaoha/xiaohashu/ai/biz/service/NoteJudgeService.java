@@ -16,7 +16,6 @@ public interface NoteJudgeService {
      *
      * @param query      用户需求
      * @param candidates 候选笔记
-     * @param topN       最多返回几篇
      */
-    List<NoteCandidateDTO> judge(String query, List<NoteCandidateDTO> candidates, int topN);
+    List<NoteCandidateDTO> judge(String query, List<NoteCandidateDTO> candidates);
 }
