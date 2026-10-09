@@ -8,6 +8,7 @@ import com.quanxiaoha.xiaohashu.ai.biz.domain.mapper.NoteMetaMapper;
 import com.quanxiaoha.xiaohashu.ai.biz.model.dto.NoteCandidateDTO;
 import com.quanxiaoha.xiaohashu.ai.biz.service.NoteRecallService;
 import com.quanxiaoha.xiaohashu.ai.biz.util.AiStringUtils;
+import com.quanxiaoha.xiaohashu.ai.biz.util.KeywordExtractor;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -90,8 +91,17 @@ public class NoteRecallServiceImpl implements NoteRecallService {
             candidates = candidates.subList(0, limit);
         }
 
+        // 关键词硬过滤：向量检索只看语义相似度，对精确关键词（品牌名、地名、型号）不敏感，
+        // 这里用用户提问中的关键词做二次过滤，过滤掉"话题沾边但不含核心关键词"的噪声笔记
+        List<String> keywords = KeywordExtractor.extract(query);
+        int beforeFilter = candidates.size();
+        if (CollUtil.isNotEmpty(keywords)) {
+            candidates = filterByKeywords(candidates, keywords);
+        }
+
         fillNoteMeta(candidates);
-        log.info("## 向量召回完成, 命中 chunk: {}, 聚合笔记: {}", documents.size(), candidates.size());
+        log.info("## 向量召回完成, 命中 chunk: {}, 聚合笔记: {}, 关键词过滤后: {} (关键词: {})",
+                documents.size(), beforeFilter, candidates.size(), keywords);
         return candidates;
     }
 
@@ -145,5 +155,60 @@ public class NoteRecallServiceImpl implements NoteRecallService {
         return meta != null
                 && Objects.equals(meta.getStatus(), 1)
                 && Objects.equals(meta.getVisible(), 0);
+    }
+
+    /**
+     * 关键词硬过滤：候选笔记的标题/话题/所有命中片段中，至少包含一个用户提问的关键词才保留。
+     *
+     * <p>向量检索对精确关键词（品牌名、地名、型号）不敏感，容易召回"话题沾边但不相关"的笔记，
+     * 这里用关键词做硬性兜底，把完全不含核心关键词的噪声过滤掉。</p>
+     *
+     * @param candidates 候选笔记列表
+     * @param keywords   用户提问提取的关键词
+     * @return 过滤后的候选笔记
+     */
+    private List<NoteCandidateDTO> filterByKeywords(List<NoteCandidateDTO> candidates, List<String> keywords) {
+        if (CollUtil.isEmpty(candidates) || CollUtil.isEmpty(keywords)) {
+            return candidates;
+        }
+        List<NoteCandidateDTO> result = new ArrayList<>(candidates.size());
+        for (NoteCandidateDTO candidate : candidates) {
+            if (containsAnyKeyword(candidate, keywords)) {
+                result.add(candidate);
+            }
+        }
+        // fallback：如果关键词过滤后全部被过滤掉，说明关键词提取可能不准或笔记内容不含显式关键词，
+        // 此时退回原列表，交给判优阶段用大模型判断，避免漏召回
+        if (result.isEmpty()) {
+            log.info("## 关键词过滤后无候选，退回原列表, 关键词: {}", keywords);
+            return candidates;
+        }
+        return result;
+    }
+
+    /**
+     * 判断候选笔记是否包含至少一个关键词
+     * <p>匹配范围：标题 + 话题 + 所有命中片段（分片时已把标题/话题拼入片段，所以 chunks 已覆盖大部分信息）。</p>
+     */
+    private boolean containsAnyKeyword(NoteCandidateDTO candidate, List<String> keywords) {
+        StringBuilder text = new StringBuilder();
+        if (AiStringUtils.isNotBlank(candidate.getTitle())) {
+            text.append(candidate.getTitle()).append(' ');
+        }
+        if (AiStringUtils.isNotBlank(candidate.getTopicName())) {
+            text.append(candidate.getTopicName()).append(' ');
+        }
+        if (CollUtil.isNotEmpty(candidate.getChunks())) {
+            for (String chunk : candidate.getChunks()) {
+                text.append(chunk).append(' ');
+            }
+        }
+        String haystack = text.toString().toLowerCase();
+        for (String keyword : keywords) {
+            if (haystack.contains(keyword.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

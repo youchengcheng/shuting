@@ -39,7 +39,7 @@
 
       <!-- 评论内容 -->
       <p class="comment-item__content">
-        <span v-if="comment.replyUserName" class="comment-item__reply">回复 {{ comment.replyUserName }}：</span>
+        <span v-if="comment.replyUserName" class="comment-item__reply">回复 <span class="comment-item__reply-name">{{ comment.replyUserName }}</span>：</span>
         {{ comment.content }}
       </p>
 
@@ -283,6 +283,11 @@ const handleExpandReplies = (comment) => {
 
 .comment-item__reply {
   color: var(--color-ink-soft);
+}
+
+/* 被回复者名字单独设为淡灰色，区别于评论者名字 */
+.comment-item__reply-name {
+  color: var(--color-ink-faint);
 }
 
 .comment-item__image img {

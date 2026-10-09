@@ -6,9 +6,9 @@ export const useChatStore = defineStore('chat', () => {
 
   // 定义模型列表
   const models = ref([
-  { id: 1, label: 'gpt-5.6-sol', name: 'qwen3.8-max', icon: 'deepseek-logo', description: '聊天对话', selected: true },
+  { id: 1, label: 'gpt-5.6-sol', name: 'qwen3.8-max', icon: 'chatGPT', description: '聊天对话', selected: true },
   { id: 2, label: 'claude-fable-5',name: 'qwen3.5-omni-flash',icon: 'claude', description: '图片生成', selected: false },
-  { id: 2, label: 'deepseek-v4-pro',name: 'qwen3.5-omni-flash',icon: 'chatGPT', description: '视频生成', selected: false },
+  { id: 2, label: 'deepseek-v4-pro',name: 'qwen3.5-omni-flash',icon: 'deepseek-logo', description: '视频生成', selected: false },
 ])
 
 

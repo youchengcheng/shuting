@@ -8,12 +8,14 @@ import com.quanxiaoha.xiaohashu.ai.biz.model.dto.NoteCandidateDTO;
 import com.quanxiaoha.xiaohashu.ai.biz.prompts.NotePrompts;
 import com.quanxiaoha.xiaohashu.ai.biz.service.NotePolishService;
 import com.quanxiaoha.xiaohashu.ai.biz.util.AiStringUtils;
+import com.quanxiaoha.xiaohashu.ai.biz.util.DateTimeTools;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import java.time.LocalTime;
 import java.util.List;
 
 /**
@@ -62,6 +64,7 @@ public class NotePolishServiceImpl implements NotePolishService {
         String content = chatClient.prompt()
                 .system(NotePrompts.DIRECT_SYSTEM)
                 .user(NotePrompts.buildDirectUserPrompt(query))
+                .tools(new DateTimeTools())
                 .call()
                 .content();
         if (AiStringUtils.isBlank(content)) {
@@ -75,6 +78,7 @@ public class NotePolishServiceImpl implements NotePolishService {
         return chatClient.prompt()
                 .system(NotePrompts.DIRECT_SYSTEM)
                 .user(NotePrompts.buildDirectUserPrompt(query))
+                .tools(new DateTimeTools())
                 .stream()
                 .content();
     }

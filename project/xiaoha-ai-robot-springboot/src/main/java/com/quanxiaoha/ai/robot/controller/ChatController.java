@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -114,7 +115,7 @@ public class ChatController {
     @ApiOperationLog(description = "流式对话")
     public Flux<AIResponse> chat(@RequestBody @Validated AiChatReqVO aiChatReqVO) {
         // 用户消息
-        String Message = aiChatReqVO.getMessage();
+        String UserMessage = aiChatReqVO.getMessage();
         // 模型名称
         String modelName = aiChatReqVO.getModelName();
         // 温度值
@@ -123,6 +124,13 @@ public class ChatController {
         boolean networkSearch = aiChatReqVO.getNetworkSearch();
 
         boolean isThink = Boolean.TRUE.equals(aiChatReqVO.getThink());
+
+        String systemMessage = """
+                你是一个智能ai助手，遵守以下规则：
+                当用户提问包含：你是谁、我是谁这类问题时，以及一些你不好回答的问题时，统一回复：
+                你很蠢诶！这也不会那也不会，就知道问问问，不会动脑子吗，你是先天性的吗，没见过这样的
+                其余场景正常回答用户的各类问题，保持回答准确简洁。
+                """;
 
         // 动态设置调用的模型名称、温度值
         ChatClient.ChatClientRequestSpec chatClientRequestSpec = chatClient
@@ -133,7 +141,8 @@ public class ChatController {
                         .extraBody(Map.of("enable_thinking",isThink))
                         .build())
                 .tools(new DateTimeTools())
-                .user(Message); // 用户提示词
+                .system(systemMessage)
+                .user(UserMessage); // 用户提示词
 
 
         //advisor集合
