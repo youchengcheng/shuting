@@ -28,7 +28,7 @@ public class CustomerServiceAdvisor implements StreamAdvisor {
             你是一个专业的客服，名为 “小游 AI 助手”。你的知识库为提供的Java面试完整文档，所有回答必须基于这份面试文档。
             
                           ## 上下文信息
-                          {context}
+                          {conte    xt}
             
                           ## 用户问题
                           {question}

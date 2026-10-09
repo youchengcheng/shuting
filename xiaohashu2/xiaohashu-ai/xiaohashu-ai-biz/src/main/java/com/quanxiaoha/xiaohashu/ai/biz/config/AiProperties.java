@@ -95,19 +95,19 @@ public class AiProperties {
         private boolean rebuildEnabled = false;
 
         /**
-         * 单个 chunk 的目标字符数
+         * 单个 chunk 的目标字符数（对半砍到 140，单 chunk 只含一个小话题点）
          */
-        private int chunkSize = 400;
+        private int chunkSize = 100;
 
         /**
-         * 相邻 chunk 的重叠字符数，避免语义被切断
+         * 相邻 chunk 的重叠字符数，避免语义被切断（建议占 chunkSize 的 15-20%）
          */
-        private int chunkOverlap = 80;
+        private int chunkOverlap = 20;
 
         /**
          * 单篇笔记最多切分出的 chunk 数，防止超长笔记把向量库撑爆
          */
-        private int maxChunksPerNote = 50;
+        private int maxChunksPerNote = 30;
 
         /**
          * 每日全量重建的 cron 表达式

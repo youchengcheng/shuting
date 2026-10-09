@@ -98,6 +98,11 @@ public class NoteJudgeServiceImpl implements NoteJudgeService {
         return batch;
     }
 
+    /**
+     * 判优阶段提供给模型的最大片段数（含最佳片段）
+     */
+    private static final int JUDGE_MAX_CHUNKS = 4;
+
     private String buildCandidatesText(List<NoteCandidateDTO> batch) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < batch.size(); i++) {
@@ -108,14 +113,11 @@ public class NoteJudgeServiceImpl implements NoteJudgeService {
             if (AiStringUtils.isNotBlank(candidate.getTopicName())) {
                 sb.append("话题：").append(candidate.getTopicName()).append('\n');
             }
-            // 除最佳片段外，附带第2高分片段，避免单片段信息不全导致误判
-            String secondChunk = pickSecondChunk(candidate);
-            sb.append("片段1：")
-                    .append(AiStringUtils.truncate(candidate.getBestChunk(), AiConstants.JUDGE_CHUNK_MAX_CHARS))
-                    .append('\n');
-            if (secondChunk != null) {
-                sb.append("片段2：")
-                        .append(AiStringUtils.truncate(secondChunk, AiConstants.JUDGE_CHUNK_MAX_CHARS))
+            // 提供多个命中片段，避免单片段信息不全导致误判
+            List<String> topChunks = pickTopChunks(candidate, JUDGE_MAX_CHUNKS);
+            for (int j = 0; j < topChunks.size(); j++) {
+                sb.append("片段").append(j + 1).append("：")
+                        .append(AiStringUtils.truncate(topChunks.get(j), AiConstants.JUDGE_CHUNK_MAX_CHARS))
                         .append('\n');
             }
             sb.append('\n');
@@ -124,23 +126,30 @@ public class NoteJudgeServiceImpl implements NoteJudgeService {
     }
 
     /**
-     * 从候选笔记的所有命中片段中挑出「第二高分」的片段，作为判优补充上下文。
-     * <p>bestChunk 只保留了最高分片段，但单片段可能恰好不包含用户关注的关键词，
-     * 附一个次高片段能显著降低误判概率。</p>
+     * 从候选笔记的所有命中片段中挑出前 N 个不同的片段（最佳片段排第一），作为判优上下文。
+     * <p>单片段可能恰好不包含用户关注的关键词，提供多个片段能显著降低误判概率。</p>
      */
-    private String pickSecondChunk(NoteCandidateDTO candidate) {
+    private List<String> pickTopChunks(NoteCandidateDTO candidate, int n) {
         List<String> chunks = candidate.getChunks();
-        if (CollUtil.isEmpty(chunks) || chunks.size() < 2) {
-            return null;
+        if (CollUtil.isEmpty(chunks)) {
+            return Collections.emptyList();
         }
-        // chunks 按召回顺序排列，bestChunk 是其中最高分的，其余取第一个不等于 bestChunk 的
+        List<String> result = new ArrayList<>(n);
+        // 最佳片段排第一
         String best = candidate.getBestChunk();
+        if (AiStringUtils.isNotBlank(best)) {
+            result.add(best);
+        }
+        // 再补充其他不同的片段
         for (String chunk : chunks) {
-            if (!chunk.equals(best)) {
-                return chunk;
+            if (result.size() >= n) {
+                break;
+            }
+            if (!result.contains(chunk)) {
+                result.add(chunk);
             }
         }
-        return null;
+        return result;
     }
 
     /**
