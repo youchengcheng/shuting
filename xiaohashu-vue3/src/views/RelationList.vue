@@ -129,10 +129,10 @@ const fetchFollowingList = async (isLoadMore = false) => {
     if (res.success) {
       const newUsers = res.data || []
       
-      // 处理数据，添加 isLiked 字段
+      // 使用后端返回的关注关系状态（0-未关注 1-已关注 2-互关）
       const processedUsers = newUsers.map(user => ({
         ...user,
-        isLiked: true // 关注列表中的用户默认都是已关注的
+        followStatus: user.followStatus ?? 1
       }))
       
       if (isLoadMore) {
@@ -172,10 +172,10 @@ const fetchFollowersList = async (isLoadMore = false) => {
     if (res.success) {
       const newUsers = res.data || []
       
-      // 处理数据，添加 isLiked 字段（粉丝可能已关注也可能未关注）
+      // 使用后端返回的关注关系状态（0-未关注 2-互关）
       const processedUsers = newUsers.map(user => ({
         ...user,
-        isLiked: user.isLiked || false
+        followStatus: user.followStatus ?? 0
       }))
       
       if (isLoadMore) {
@@ -212,16 +212,22 @@ const handleFollowUser = (followUserId) => {
   if (userIndex === -1) return
 
   const user = users.value[userIndex]
-  const request = user.isLiked ? unfollowUser(followUserId) : followUser(followUserId)
+  const wasFollowing = (user.followStatus ?? 0) > 0
+  const request = wasFollowing ? unfollowUser(followUserId) : followUser(followUserId)
   request.then(res => {
     if (!res.success) {
       message.show(res.message)
       return
     }
-    
-    // 更新用户关注状态
-    user.isLiked = !user.isLiked
-    message.show(user.isLiked ? '关注成功' : '取消关注成功')
+    if (wasFollowing) {
+      // 取消关注 -> 未关注
+      user.followStatus = 0
+      message.show('取消关注成功')
+    } else {
+      // 粉丝列表中对方本就关注我，回关即互关(2)；关注列表中为单向关注(1)
+      user.followStatus = listType.value === 'fans' ? 2 : 1
+      message.show('关注成功')
+    }
   })
 }
 

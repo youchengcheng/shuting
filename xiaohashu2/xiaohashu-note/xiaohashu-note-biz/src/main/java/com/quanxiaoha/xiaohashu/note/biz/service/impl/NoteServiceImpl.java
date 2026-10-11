@@ -1861,16 +1861,16 @@ public class NoteServiceImpl implements NoteService {
         Long creatorId = findNoteDetailRspVO.getCreatorId();
         // 未登录、作者为空、查看自己的笔记，一律按未关注处理
         if (Objects.isNull(currUserId) || Objects.isNull(creatorId) || Objects.equals(currUserId, creatorId)) {
-            findNoteDetailRspVO.setIsFollowing(Boolean.FALSE);
+            findNoteDetailRspVO.setFollowStatus(0);
             return;
         }
 
         try {
-            findNoteDetailRspVO.setIsFollowing(relationRpcService.isFollowed(creatorId));
+            findNoteDetailRspVO.setFollowStatus(relationRpcService.isFollowed(creatorId));
         } catch (Exception e) {
             // 关注状态属于附加信息，查询失败降级为未关注，不能影响笔记详情返回
-            log.error("==> 查询当前用户是否已关注作者失败, currUserId: {}, creatorId: {}", currUserId, creatorId, e);
-            findNoteDetailRspVO.setIsFollowing(Boolean.FALSE);
+            log.error("==> 查询当前用户与作者关注关系失败, currUserId: {}, creatorId: {}", currUserId, creatorId, e);
+            findNoteDetailRspVO.setFollowStatus(0);
         }
     }
 

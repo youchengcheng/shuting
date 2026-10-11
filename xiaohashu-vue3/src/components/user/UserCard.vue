@@ -23,16 +23,16 @@
     <button
       type="button"
       class="st-btn user-card__follow"
-      :class="user.isLiked ? 'st-btn-ghost' : 'st-btn-primary'"
+      :class="followStatus > 0 ? 'st-btn-ghost' : 'st-btn-primary'"
       @click="handleFollow"
     >
-      {{ user.isLiked ? '已关注' : '关注' }}
+      {{ followBtnText }}
     </button>
   </div>
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue'
+import { defineProps, defineEmits, computed } from 'vue'
 import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
@@ -51,7 +51,7 @@ const props = defineProps({
       xiaohashuId: '',
       fansTotal: 0,
       noteTotal: 0,
-      isLiked: true,
+      followStatus: 0,
       introduction: ''
     })
   }
@@ -59,6 +59,20 @@ const props = defineProps({
 
 const emit = defineEmits(['follow'])
 const userStore = useUserStore()
+
+// 兼容旧字段 isLiked：优先使用 followStatus，否则回退到 isLiked
+const followStatus = computed(() => {
+  const fs = props.user.followStatus
+  if (fs === 0 || fs === 1 || fs === 2) return fs
+  return props.user.isLiked ? 1 : 0
+})
+
+// 按钮文案：0-关注 / 1-已关注 / 2-互相关注
+const followBtnText = computed(() => {
+  if (followStatus.value === 2) return '互相关注'
+  if (followStatus.value === 1) return '已关注'
+  return '关注'
+})
 
 // 处理关注按钮点击
 const handleFollow = () => {

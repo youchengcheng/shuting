@@ -2,6 +2,7 @@ package com.quanxiaoha.xiaohashu.search.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import com.google.common.collect.Lists;
+import com.quanxiaoha.framework.biz.context.holder.LoginUserContextHolder;
 import com.quanxiaoha.framework.common.response.PageResponse;
 import com.quanxiaoha.framework.common.response.Response;
 import com.quanxiaoha.framework.common.util.NumberUtils;
@@ -12,6 +13,8 @@ import com.quanxiaoha.xiaohashu.search.index.UserIndex;
 import com.quanxiaoha.xiaohashu.search.model.vo.SearchUserReqVO;
 import com.quanxiaoha.xiaohashu.search.model.vo.SearchUserRspVO;
 import com.quanxiaoha.xiaohashu.search.service.UserService;
+import com.quanxiaoha.xiaohashu.user.relation.api.RelationFeignApi;
+import com.quanxiaoha.xiaohashu.user.relation.dto.req.IsFollowedReqDTO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.elasticsearch.action.index.IndexRequest;
@@ -43,6 +46,8 @@ public class UserServiceImpl implements UserService {
     private RestHighLevelClient restHighLevelClient;
     @Resource
     private SelectMapper selectMapper;
+    @Resource
+    private RelationFeignApi relationFeignApi;
 
     /*
      * 搜索用户
@@ -142,7 +147,37 @@ public class UserServiceImpl implements UserService {
         }catch (Exception e){
             log.error("==> 查询 Elasticserach 异常: ", e);
         }
+
+        // 填充当前登录用户与搜索结果的关注关系状态
+        fillFollowStatus(searchUserRspVOS);
+
         return PageResponse.success(searchUserRspVOS,pageNo,total);
+    }
+
+    /*
+     * 批量填充搜索结果的关注关系状态
+     * */
+    private void fillFollowStatus(List<SearchUserRspVO> searchUserRspVOS) {
+        if (CollUtil.isEmpty(searchUserRspVOS)) {
+            return;
+        }
+        Long currUserId = LoginUserContextHolder.getUserId();
+        for (SearchUserRspVO vo : searchUserRspVOS) {
+            // 未登录或搜索到自己，置为未关注
+            if (Objects.isNull(currUserId) || Objects.equals(vo.getUserId(), currUserId)) {
+                vo.setFollowStatus(0);
+                continue;
+            }
+            try {
+                IsFollowedReqDTO req = IsFollowedReqDTO.builder().followUserId(vo.getUserId()).build();
+                Response<Integer> resp = relationFeignApi.isFollowed(req);
+                vo.setFollowStatus(Objects.nonNull(resp) && resp.isSuccess()
+                        ? Objects.requireNonNullElse(resp.getData(), 0) : 0);
+            } catch (Exception e) {
+                log.error("==> 搜索结果填充关注状态失败, userId: {}", vo.getUserId(), e);
+                vo.setFollowStatus(0);
+            }
+        }
     }
 
     private String getString(Map<String, Object> source, String key) {

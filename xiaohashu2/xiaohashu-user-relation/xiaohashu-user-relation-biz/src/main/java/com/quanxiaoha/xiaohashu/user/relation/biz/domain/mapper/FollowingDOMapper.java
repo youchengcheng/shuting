@@ -50,5 +50,17 @@ public interface FollowingDOMapper {
      */
     List<FollowingDO> selectAllByUserId(Long userId);
 
+    /**
+     * 查询 userId 关注了 targetUserIds 中的哪些人（返回被关注的 user_id 列表）
+     */
+    List<Long> selectFollowedUserIds(@Param("userId") Long userId,
+                                     @Param("targetUserIds") List<Long> targetUserIds);
+
+    /**
+     * 查询 userIds 中哪些人关注了 targetUserId（返回关注了 targetUserId 的 user_id 列表）
+     */
+    List<Long> selectUserIdsWhoFollowTarget(@Param("targetUserId") Long targetUserId,
+                                            @Param("userIds") List<Long> userIds);
+
 
 }

@@ -40,9 +40,9 @@
               <button 
               v-if="!userStore.token || userStore.profile.userId !== currNote.creatorId"
               @click="handleFollow"
-              :class="isFollowing ? 'st-btn-ghost' : 'st-btn-primary'"
+              :class="followStatus > 0 ? 'st-btn-ghost' : 'st-btn-primary'"
               class="st-btn w-[96px]">
-                {{ isFollowing ? '已关注' : '关注' }}
+                {{ followStatus === 2 ? '互相关注' : followStatus === 1 ? '已关注' : '关注' }}
               </button>
             </div>
 
@@ -320,7 +320,7 @@ import { getNoteDetail, likeNote, unlikeNote, collectNote, uncollectNote, isLike
 import { getCommentList, publishComment, getChildCommentList, likeComment, unlikeComment, deleteComment } from '@/api/comment'
 import { fetchIdempotentToken } from '@/api/idempotent'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import { followUser, unfollowUser } from '@/api/relation'
+import { followUser, unfollowUser, isFollowedUser } from '@/api/relation'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useNoteStore } from '@/stores/note'
@@ -344,7 +344,7 @@ const props = defineProps({
 
 const currNote = ref({})
 const currNoteId = ref('')
-const isFollowing = ref(false)
+const followStatus = ref(0)
 
 // 打开详情时卡片上已经加载好的封面：数据到位前先顶上媒体区
 const optimisticCover = computed(() => {
@@ -533,7 +533,7 @@ watch(() => props.noteId, (newNoteId) => {
           collectTotal: Number(res.data.collectTotal ?? props.note?.collectTotal ?? 0),
           commentTotal: Number(res.data.commentTotal ?? props.note?.commentTotal ?? 0)
         }
-        isFollowing.value = Boolean(res.data?.isFollowing)
+        followStatus.value = Number(res.data?.followStatus) || 0
       }
     })
     
@@ -572,7 +572,7 @@ watch(() => props.noteId, (newNoteId) => {
     isScrolled.value = false
     isNoteLiked.value = false
     isNoteCollected.value = false
-    isFollowing.value = false
+    followStatus.value = 0
     // 关闭删除评论确认框，避免下次打开残留
     showDeleteCommentDialog.value = false
     pendingDeleteComment.value = null
@@ -1072,7 +1072,8 @@ const handleFollow = () => {
     showLoginModal.value = true
     return
   }
-  const request = isFollowing.value
+  const wasFollowing = followStatus.value > 0
+  const request = wasFollowing
     ? unfollowUser(currNote.value.creatorId)
     : followUser(currNote.value.creatorId)
   request.then(res => {
@@ -1080,8 +1081,11 @@ const handleFollow = () => {
       message.show(res.message)
       return
     }
-    isFollowing.value = !isFollowing.value
-    message.show(isFollowing.value ? '关注成功' : '取消关注成功')
+    // 重新查询关注关系状态（关注后是否互关取决于对方，前端无法预判）
+    isFollowedUser(currNote.value.creatorId).then(r => {
+      if (r.success) followStatus.value = Number(r.data) || 0
+    })
+    message.show(wasFollowing ? '取消关注成功' : '关注成功')
   })
 }
 </script>

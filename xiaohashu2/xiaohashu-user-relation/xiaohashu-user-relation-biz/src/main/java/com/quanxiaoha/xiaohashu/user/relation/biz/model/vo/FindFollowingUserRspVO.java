@@ -22,5 +22,10 @@ public class FindFollowingUserRspVO {
 
     private String introduction;
 
+    /**
+     * 关注关系状态：0-未关注 1-已关注 2-互相关注
+     */
+    private Integer followStatus;
+
 }
 

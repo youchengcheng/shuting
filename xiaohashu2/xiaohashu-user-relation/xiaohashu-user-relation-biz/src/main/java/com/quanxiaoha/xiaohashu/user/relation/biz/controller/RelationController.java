@@ -59,11 +59,12 @@ public class RelationController {
     }
 
     /*
-    * 校验当前登录用户是否已关注目标用户
+    * 校验当前登录用户与目标用户的关注关系状态
+    * 返回 0-未关注 / 1-已关注(单向) / 2-互相关注
     * */
     @PostMapping("/isFollowed")
-    @ApiOperationLog(description = "校验是否已关注")
-    public Response<Boolean> isFollowed(@Validated @RequestBody IsFollowedReqDTO isFollowedReqDTO){
+    @ApiOperationLog(description = "校验关注关系状态")
+    public Response<Integer> isFollowed(@Validated @RequestBody IsFollowedReqDTO isFollowedReqDTO){
         return relationService.isFollowed(isFollowedReqDTO);
     }
 }

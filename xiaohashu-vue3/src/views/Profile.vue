@@ -22,9 +22,9 @@
             <button 
               v-if="!userStore.token || userStore.profile.userId !== profile.userId"
               @click="handleFollow"
-              :class="isFollowing ? 'st-btn-ghost' : 'st-btn-primary'"
+              :class="followStatus > 0 ? 'st-btn-ghost' : 'st-btn-primary'"
               class="st-btn w-[96px]">
-              {{ isFollowing ? '已关注' : '关注' }}
+              {{ followStatus === 2 ? '互相关注' : followStatus === 1 ? '已关注' : '关注' }}
             </button>
             <!-- 编辑按钮和下拉菜单 -->
             <div class="relative">
@@ -273,7 +273,7 @@ const handleClickOutside = (event) => {
 }
 
 const profile = ref({})
-const isFollowing = ref(false)
+const followStatus = ref(0)
 
 // Tab 导航配置：与小红书一致（笔记 / 点赞 / 收藏）；“笔记”数量使用后端返回的真实数据
 // 图标语义：like 为心形（点赞）、collect 为星形（收藏）
@@ -596,13 +596,13 @@ const refreshFollowStatus = (userId) => {
   const selfId = userStore.profile?.userId
 
   if (!targetId || !userStore.token || (selfId !== undefined && String(selfId) === String(targetId))) {
-    isFollowing.value = false
+    followStatus.value = 0
     return
   }
 
   isFollowedUser(targetId).then(res => {
     if (res.success) {
-      isFollowing.value = Boolean(res.data)
+      followStatus.value = Number(res.data) || 0
     }
   }).catch(() => {
     // 关注状态获取失败时静默处理，不打断页面展示
@@ -634,7 +634,8 @@ const handleFollow = () => {
     showLoginModal.value = true
     return
   }
-  const request = isFollowing.value
+  const wasFollowing = followStatus.value > 0
+  const request = wasFollowing
     ? unfollowUser(profile.value.userId)
     : followUser(profile.value.userId)
   request.then(res => {
@@ -642,10 +643,11 @@ const handleFollow = () => {
       message.show(res.message)
       return
     }
-    isFollowing.value = !isFollowing.value
     const currentFans = Number(profile.value.fansTotal || 0)
-    profile.value.fansTotal = Math.max(0, currentFans + (isFollowing.value ? 1 : -1))
-    message.show(isFollowing.value ? '关注成功' : '取消关注成功')
+    profile.value.fansTotal = Math.max(0, currentFans + (wasFollowing ? -1 : 1))
+    // 重新查询关注关系状态（关注后是否互关取决于对方，前端无法预判）
+    refreshFollowStatus(profile.value.userId)
+    message.show(wasFollowing ? '取消关注成功' : '关注成功')
   })
 }
 

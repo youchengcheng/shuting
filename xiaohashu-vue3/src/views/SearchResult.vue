@@ -301,7 +301,7 @@ const performSearch = (isFirstPage = true) => {
         const newResults = (res.data || []).map(item => ({
           ...item,
           id: item.id ?? item.userId,
-          isLiked: Boolean(item.isLiked)
+          followStatus: item.followStatus ?? 0
         }))
         
         // 检查是否有重复数据
@@ -427,14 +427,15 @@ const onNoteClick = (note) => {
 const handleFollowUser = (userId) => {
   const user = searchResults.value.find(item => (item.id ?? item.userId) === userId)
   if (!user) return
-  const request = user.isLiked ? unfollowUser(userId) : followUser(userId)
+  const wasFollowing = (user.followStatus ?? 0) > 0
+  const request = wasFollowing ? unfollowUser(userId) : followUser(userId)
   request.then(res => {
     if (!res.success) {
       message.show(res.message)
       return
     }
-    user.isLiked = !user.isLiked
-    message.show(user.isLiked ? '关注成功' : '取消关注成功')
+    user.followStatus = wasFollowing ? 0 : 1
+    message.show(wasFollowing ? '取消关注成功' : '关注成功')
   })
 }
 

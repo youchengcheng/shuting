@@ -63,9 +63,9 @@ public class FindNoteDetailRspVO {
     private String creatorName;
 
     /**
-     * 当前登录用户是否已关注作者（用户态数据，不写入缓存）
+     * 当前登录用户与作者的关注关系状态：0-未关注 1-已关注 2-互相关注（用户态数据，不写入缓存）
      */
-    private Boolean isFollowing;
+    private Integer followStatus;
 
     /**
      * 发布者头像

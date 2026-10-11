@@ -28,8 +28,9 @@ public interface RelationService {
     PageResponse<FindFansUserRspVO> findFansList(FindFansListReqVO findFansListReqVO);
 
     /*
-    * 校验当前登录用户是否已关注目标用户
+    * 校验当前登录用户与目标用户的关注关系状态
+    * 返回 0-未关注 / 1-已关注(单向) / 2-互相关注
     * */
-    Response<Boolean> isFollowed(IsFollowedReqDTO isFollowedReqDTO);
+    Response<Integer> isFollowed(IsFollowedReqDTO isFollowedReqDTO);
 
 }

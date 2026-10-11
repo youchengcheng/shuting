@@ -47,4 +47,9 @@ public class SearchUserRspVO {
      * 昵称：关键词高亮
      */
     private String highlightNickname;
+
+    /**
+     * 关注关系状态：0-未关注 1-已关注 2-互相关注
+     */
+    private Integer followStatus;
 }
