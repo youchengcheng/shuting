@@ -109,6 +109,17 @@
             <artifactId>xiaohashu-search-api</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.quanxiaoha</groupId>
+            <artifactId>xiaohashu-user-relation-api</artifactId>
+        </dependency>
+
+        <!-- 上下文组件（用于获取登录用户 ID） -->
+        <dependency>
+            <groupId>com.quanxiaoha</groupId>
+            <artifactId>xiaoha-spring-boot-starter-biz-context</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

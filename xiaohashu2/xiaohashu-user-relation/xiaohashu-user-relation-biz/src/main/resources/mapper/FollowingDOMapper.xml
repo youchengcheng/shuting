@@ -118,5 +118,27 @@
     select following_user_id,create_time from t_following where user_id = #{userId} limit 1000
   </select>
 
+  <!-- 查询 userId 关注了 targetUserIds 中的哪些人 -->
+  <select id="selectFollowedUserIds" resultType="java.lang.Long">
+    select following_user_id
+    from t_following
+    where user_id = #{userId}
+      and following_user_id in
+    <foreach collection="targetUserIds" item="id" open="(" separator="," close=")">
+      #{id}
+    </foreach>
+  </select>
+
+  <!-- 查询 userIds 中哪些人关注了 targetUserId -->
+  <select id="selectUserIdsWhoFollowTarget" resultType="java.lang.Long">
+    select user_id
+    from t_following
+    where user_id in
+    <foreach collection="userIds" item="id" open="(" separator="," close=")">
+      #{id}
+    </foreach>
+      and following_user_id = #{targetUserId}
+  </select>
+
 
 </mapper>

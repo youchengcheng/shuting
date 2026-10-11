@@ -13,9 +13,10 @@ public interface RelationFeignApi {
     String PREFIX = "/relation";
 
     /*
-    * 校验当前登录用户是否已关注目标用户
+    * 校验当前登录用户与目标用户的关注关系状态
+    * 返回 0-未关注 / 1-已关注(单向) / 2-互相关注
     * */
     @PostMapping(value = PREFIX + "/isFollowed")
-    Response<Boolean> isFollowed(@RequestBody IsFollowedReqDTO isFollowedReqDTO);
+    Response<Integer> isFollowed(@RequestBody IsFollowedReqDTO isFollowedReqDTO);
 
 }

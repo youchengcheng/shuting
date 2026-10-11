@@ -17,21 +17,22 @@ public class RelationRpcService {
     private RelationFeignApi relationFeignApi;
 
     /*
-     * 校验当前登录用户是否已关注目标用户
+     * 校验当前登录用户与目标用户的关注关系状态
+     * 返回 0-未关注 / 1-已关注(单向) / 2-互相关注
      * 注意：必须在业务线程中调用，Feign 拦截器会从上下文取 userId 放进请求头
      * */
-    public boolean isFollowed(Long targetUserId) {
+    public int isFollowed(Long targetUserId) {
         IsFollowedReqDTO isFollowedReqDTO = IsFollowedReqDTO.builder()
                 .followUserId(targetUserId)
                 .build();
 
-        Response<Boolean> response = relationFeignApi.isFollowed(isFollowedReqDTO);
+        Response<Integer> response = relationFeignApi.isFollowed(isFollowedReqDTO);
 
         if (Objects.isNull(response) || !response.isSuccess()) {
-            return false;
+            return 0; // 降级为未关注
         }
 
-        return Boolean.TRUE.equals(response.getData());
+        return Objects.requireNonNullElse(response.getData(), 0);
     }
 
 }

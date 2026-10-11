@@ -17,6 +17,7 @@ import com.quanxiaoha.xiaohashu.user.relation.biz.domain.dataobject.FollowingDO;
 import com.quanxiaoha.xiaohashu.user.relation.biz.domain.mapper.FansDOMapper;
 import com.quanxiaoha.xiaohashu.user.relation.biz.domain.mapper.FollowingDOMapper;
 import com.quanxiaoha.xiaohashu.user.relation.biz.enums.FollowCheckResultEnum;
+import com.quanxiaoha.xiaohashu.user.relation.biz.enums.FollowStatusEnum;
 import com.quanxiaoha.xiaohashu.user.relation.biz.enums.LuaResultEnum;
 import com.quanxiaoha.xiaohashu.user.relation.biz.enums.ResponseCodeEnum;
 import com.quanxiaoha.xiaohashu.user.relation.biz.model.dto.FollowUserMqDTO;
@@ -41,6 +42,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -166,17 +168,18 @@ public class RelationServiceImpl implements RelationService {
     }
 
     /*
-     * 校验当前登录用户是否已关注目标用户
+     * 校验当前登录用户与目标用户的关注关系状态
+     * 返回 0-未关注 / 1-已关注(单向) / 2-互相关注
      * */
     @Override
-    public Response<Boolean> isFollowed(IsFollowedReqDTO isFollowedReqDTO) {
+    public Response<Integer> isFollowed(IsFollowedReqDTO isFollowedReqDTO) {
         Long followUserId = isFollowedReqDTO.getFollowUserId();
         // 当前登录用户（由网关注入的 userId 请求头解析而来）
         Long currUserId = LoginUserContextHolder.getUserId();
 
         // 未登录、或查询的是自己，直接返回未关注
         if (Objects.isNull(currUserId) || Objects.equals(currUserId, followUserId)) {
-            return Response.success(Boolean.FALSE);
+            return Response.success(FollowStatusEnum.NOT_FOLLOWED.getCode());
         }
 
         // 1.先查 Redis 中的关注列表缓存
@@ -189,12 +192,13 @@ public class RelationServiceImpl implements RelationService {
         Long result = redisTemplate.execute(script, Collections.singletonList(followingRedisKey), followUserId);
         FollowCheckResultEnum followCheckResultEnum = FollowCheckResultEnum.valueOf(result);
 
-        // 缓存命中：直接以缓存结果为准
+        // 缓存命中：已关注，需进一步判断是否互关
         if (Objects.equals(FollowCheckResultEnum.FOLLOWED, followCheckResultEnum)) {
-            return Response.success(Boolean.TRUE);
+            return Response.success(judgeMutualFollow(currUserId, followUserId));
         }
+        // 缓存命中：未关注
         if (Objects.equals(FollowCheckResultEnum.NOT_FOLLOWED, followCheckResultEnum)) {
-            return Response.success(Boolean.FALSE);
+            return Response.success(FollowStatusEnum.NOT_FOLLOWED.getCode());
         }
 
         // 返回值不在枚举范围内，属于异常情况，抛出业务异常
@@ -210,7 +214,21 @@ public class RelationServiceImpl implements RelationService {
         // 3.异步重建关注列表缓存，避免后续请求继续打到数据库
         threadPoolTaskExecutor.submit(() -> syncFollowingList2Redis(currUserId));
 
-        return Response.success(isFollowed);
+        // 未关注
+        if (!isFollowed) {
+            return Response.success(FollowStatusEnum.NOT_FOLLOWED.getCode());
+        }
+        // 已关注，判断是否互关
+        return Response.success(judgeMutualFollow(currUserId, followUserId));
+    }
+
+    /*
+     * 判断是否互关（前提：currUserId 已关注 followUserId）
+     * 返回 1-已关注(单向) / 2-互相关注
+     * */
+    private int judgeMutualFollow(Long currUserId, Long followUserId) {
+        boolean isFollowedBack = followingDOMapper.selectCountByUserIdAndFollowingUserId(followUserId, currUserId) > 0;
+        return isFollowedBack ? FollowStatusEnum.MUTUAL_FOLLOW.getCode() : FollowStatusEnum.FOLLOWED.getCode();
     }
 
     /*
@@ -323,6 +341,8 @@ public class RelationServiceImpl implements RelationService {
     public PageResponse<FindFollowingUserRspVO> findFollowingList(FindFollowingListReqVO findFollowingListReqVO) {
         //想要查的用户id
         Long userId = findFollowingListReqVO.getUserId();
+        //当前登录用户id（用于判断互关）
+        Long currUserId = LoginUserContextHolder.getUserId();
         //页码
         Integer pageNo = findFollowingListReqVO.getPageNo();
         //先从redis中查询
@@ -364,7 +384,7 @@ public class RelationServiceImpl implements RelationService {
                         .toList();
 
                 //RPC：调用用户服务批量查询用户信息
-                findFollowingUserRspVOS = rpcUserServiceAndDTO2VO(userIds, findFollowingUserRspVOS);
+                findFollowingUserRspVOS = rpcUserServiceAndDTO2VO(userIds, findFollowingUserRspVOS, currUserId);
             }
         }else {
             //若 Redis 中没有数据，则从数据库查询
@@ -390,7 +410,7 @@ public class RelationServiceImpl implements RelationService {
             List<Long> userIds = followingDOS.stream().map(FollowingDO::getFollowingUserId).toList();
 
             //RPC 调用用户服务将DTO转为VO
-            findFollowingUserRspVOS = rpcUserServiceAndDTO2VO(userIds,findFollowingUserRspVOS);
+            findFollowingUserRspVOS = rpcUserServiceAndDTO2VO(userIds,findFollowingUserRspVOS, currUserId);
 
             //异步将关注列表全量同步到 Redis
             threadPoolTaskExecutor.submit(() -> syncFollowingList2Redis(userId));
@@ -406,6 +426,8 @@ public class RelationServiceImpl implements RelationService {
     public PageResponse<FindFansUserRspVO> findFansList(FindFansListReqVO findFansListReqVO) {
         //想要查询的用户id
         Long userId = findFansListReqVO.getUserId();
+        //当前登录用户id（用于判断是否回关）
+        Long currUserId = LoginUserContextHolder.getUserId();
         //页码
         Integer pageNo = findFansListReqVO.getPageNo();
         //先从redis中查询
@@ -441,7 +463,7 @@ public class RelationServiceImpl implements RelationService {
                         .map(Object -> Long.valueOf(Object.toString())).toList();
 
                 //RPC:批量查询用户信息
-                findFansUserRspVOS = rpcUserServiceAndCountServiceAndDTO2VO(userIds,findFansUserRspVOS);
+                findFansUserRspVOS = rpcUserServiceAndCountServiceAndDTO2VO(userIds,findFansUserRspVOS, currUserId);
             }
 
         }else {//无数据————查询数据库
@@ -466,7 +488,7 @@ public class RelationServiceImpl implements RelationService {
                 //提取所有粉丝用户id到集合中
                 List<Long> userIds = fansDOS.stream().map(FansDO::getFansUserId).toList();
                 //RPC:调用用户服务，计数服务，并将 DTO 转为 VO
-                findFansUserRspVOS = rpcUserServiceAndCountServiceAndDTO2VO(userIds,findFansUserRspVOS);
+                findFansUserRspVOS = rpcUserServiceAndCountServiceAndDTO2VO(userIds,findFansUserRspVOS, currUserId);
                 //异步将粉丝列表同步到redis中（最多5000条）
                 threadPoolTaskExecutor.submit(() -> syncFansList2Redis(userId));
             }
@@ -498,11 +520,15 @@ public class RelationServiceImpl implements RelationService {
     /*
      * 调用用户服务、计数服务，并将 DTO 转换为 VO 粉丝列表
      * */
-    private List<FindFansUserRspVO> rpcUserServiceAndCountServiceAndDTO2VO(List<Long> userIds, List<FindFansUserRspVO> findFansUserRspVOS) {
+    private List<FindFansUserRspVO> rpcUserServiceAndCountServiceAndDTO2VO(List<Long> userIds, List<FindFansUserRspVO> findFansUserRspVOS, Long currUserId) {
 
         List<FindUserByIdRspDTO> findUserByIdRspDTOS = userRpcService.findByIds(userIds);
 
         if(CollUtil.isNotEmpty(findUserByIdRspDTOS)){
+            // 批量查询：当前用户关注了这些粉丝中的哪些（回关=互关）
+            Set<Long> followedBackIds = Objects.isNull(currUserId) ? Collections.emptySet()
+                    : new HashSet<>(followingDOMapper.selectFollowedUserIds(currUserId, userIds));
+
             //1.使用糊涂包进行对象拷贝
             //findFansUserRspVOS =  BeanUtil.copyToList(findUserByIdRspDTOS,FindFansUserRspVO.class);
             //2.使用builder
@@ -513,6 +539,10 @@ public class RelationServiceImpl implements RelationService {
                             .nickname(dto.getNickName())
                             .noteTotal(0L) // TODO: 这块的数据暂无，后续补充
                             .fansTotal(0L) // TODO: 这块的数据暂无，后续补充
+                            // 粉丝本就关注我；若我也关注了 TA → 互关(2)，否则未关注(0)
+                            .followStatus(followedBackIds.contains(dto.getId())
+                                    ? FollowStatusEnum.MUTUAL_FOLLOW.getCode()
+                                    : FollowStatusEnum.NOT_FOLLOWED.getCode())
                             .build())
                     .toList();
         }
@@ -545,11 +575,15 @@ public class RelationServiceImpl implements RelationService {
     /*
     * RPC: 调用用户服务，并将 DTO 转换为 VO
     * */
-    private List<FindFollowingUserRspVO> rpcUserServiceAndDTO2VO(List<Long> userIds, List<FindFollowingUserRspVO> findFollowingUserRspVOS) {
+    private List<FindFollowingUserRspVO> rpcUserServiceAndDTO2VO(List<Long> userIds, List<FindFollowingUserRspVO> findFollowingUserRspVOS, Long currUserId) {
         List<FindUserByIdRspDTO> findUserByIdRspDTOS = userRpcService.findByIds(userIds);
 
         //查询的信息不为空，DTO 转 VO
         if (CollUtil.isNotEmpty(findUserByIdRspDTOS)) {
+            // 批量查询：这些用户中哪些也关注了当前用户（互关）
+            Set<Long> mutualUserIds = Objects.isNull(currUserId) ? Collections.emptySet()
+                    : new HashSet<>(followingDOMapper.selectUserIdsWhoFollowTarget(currUserId, userIds));
+
             //1.直接转
             findFollowingUserRspVOS = findUserByIdRspDTOS.stream().map(
                     dto -> FindFollowingUserRspVO.builder()
@@ -557,6 +591,10 @@ public class RelationServiceImpl implements RelationService {
                             .avatar(dto.getAvatar())
                             .nickname(dto.getNickName())
                             .introduction(dto.getIntroduction())
+                            // 关注列表中的用户默认已关注(1)，互关则为 2
+                            .followStatus(mutualUserIds.contains(dto.getId())
+                                    ? FollowStatusEnum.MUTUAL_FOLLOW.getCode()
+                                    : FollowStatusEnum.FOLLOWED.getCode())
                             .build()
             ).toList();
             //2.使用糊涂包
