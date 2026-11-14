@@ -25,6 +25,13 @@ public class CommentController {
 
     @Resource
     private CommentService commentService;
+    @Resource
+    private com.quanxiaoha.xiaohashu.comment.biz.service.CommentInternalQueryService internalQueries;
+
+    @PostMapping("/context")
+    public Response<CommentContextRspVO> context(@Validated @RequestBody CommentContextReqVO request) {
+        return Response.success(internalQueries.context(request));
+    }
 
     /*
     * 发布评论

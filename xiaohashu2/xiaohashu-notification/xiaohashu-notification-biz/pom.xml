@@ -1,0 +1,26 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent><groupId>com.quanxiaoha</groupId><artifactId>xiaohashu-notification</artifactId><version>${revision}</version></parent>
+    <artifactId>xiaohashu-notification-biz</artifactId>
+    <dependencies>
+        <dependency><groupId>com.quanxiaoha</groupId><artifactId>xiaohashu-notification-api</artifactId></dependency>
+        <dependency><groupId>com.quanxiaoha</groupId><artifactId>xiaoha-spring-boot-starter-biz-context</artifactId></dependency>
+        <dependency><groupId>com.quanxiaoha</groupId><artifactId>xiaoha-spring-boot-starter-jackson</artifactId></dependency>
+        <dependency><groupId>com.quanxiaoha</groupId><artifactId>xiaohashu-user-api</artifactId></dependency>
+        <dependency><groupId>com.quanxiaoha</groupId><artifactId>xiaohashu-note-api</artifactId><version>${revision}</version></dependency>
+        <dependency><groupId>com.quanxiaoha</groupId><artifactId>xiaohashu-comment-api</artifactId><version>${revision}</version></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-redis</artifactId></dependency>
+        <dependency><groupId>org.mybatis.spring.boot</groupId><artifactId>mybatis-spring-boot-starter</artifactId></dependency>
+        <dependency><groupId>mysql</groupId><artifactId>mysql-connector-java</artifactId></dependency>
+        <dependency><groupId>com.alibaba</groupId><artifactId>druid-spring-boot-3-starter</artifactId></dependency>
+        <dependency><groupId>org.springframework.cloud</groupId><artifactId>spring-cloud-starter-openfeign</artifactId></dependency>
+        <dependency><groupId>com.alibaba.cloud</groupId><artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId></dependency>
+        <dependency><groupId>org.apache.rocketmq</groupId><artifactId>rocketmq-spring-boot-starter</artifactId></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+    </dependencies>
+    <build><plugins>
+        <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.2.5</version><configuration><useModulePath>false</useModulePath></configuration></plugin>
+    </plugins></build>
+</project>

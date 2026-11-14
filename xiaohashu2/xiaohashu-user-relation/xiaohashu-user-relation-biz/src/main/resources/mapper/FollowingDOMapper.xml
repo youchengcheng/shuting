@@ -141,4 +141,7 @@
   </select>
 
 
+  <select id="selectRelationForUpdate" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" /> from t_following where user_id=#{userId} and following_user_id=#{targetId} for update
+  </select>
 </mapper>

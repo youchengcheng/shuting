@@ -16,6 +16,11 @@ import java.time.LocalDateTime;
 @Builder
 public class LikeUnlikeCommentMqDTO {
 
+    private Long commentCreatorId;
+
+    private Long noteId;
+
+
     private Long userId;
 
     private Long commentId;

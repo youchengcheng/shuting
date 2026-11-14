@@ -67,7 +67,7 @@
       </button>
 
       <!-- 通知 -->
-      <router-link to="/notifications" class="nav-item" active-class="nav-item--active">
+      <router-link to="/notifications" class="nav-item" active-class="nav-item--active" :aria-label="notificationStore.summary.totalUnread ? `通知，${notificationStore.summary.totalUnread}条未读` : '通知'">
         <span class="nav-item__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none">
             <path
@@ -81,19 +81,20 @@
           </svg>
         </span>
         <span class="nav-item__label">通知</span>
+        <span v-if="notificationStore.summary.totalUnread > 0" class="notification-badge st-num" aria-hidden="true">{{ notificationStore.summary.totalUnread > 99 ? '99+' : notificationStore.summary.totalUnread }}</span>
       </router-link>
 
       <!-- 我 -->
       <router-link
         v-if="isLoggedIn"
-        :to="`/user/profile/${profile.userId}`"
+        :to="ownProfilePath(profile)"
         class="nav-item"
         active-class="nav-item--active"
       >
         <img class="nav-item__avatar" :src="profile.avatar || defaultAvatar" alt="" />
         <span class="nav-item__label">我</span>
       </router-link>
-      <button v-else type="button" class="nav-item" @click="handleShowLogin">
+      <button v-else type="button" class="nav-item" aria-label="登录后查看我的主页" @click="handleShowLogin">
         <span class="nav-item__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none">
             <path
@@ -153,6 +154,8 @@
 import { computed, inject, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useNotificationStore } from '@/stores/notification'
+import { ownProfilePath } from '@/utils/profileSession'
 import MoreMenu from './MoreMenu.vue'
 import AboutModal from './AboutModal.vue'
 import ChangePasswordModal from '@/components/auth/ChangePasswordModal.vue'
@@ -162,6 +165,7 @@ import defaultAvatar from '@/assets/avatar.png'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const notificationStore = useNotificationStore()
 
 const showLoginModal = inject('showLoginModal')
 const showPublishModal = inject('showPublishModal', null)
@@ -198,6 +202,7 @@ const handlePublish = () => {
 </script>
 
 <style scoped>
+.nav-item:disabled { opacity: .65; cursor: wait; }
 .sidebar {
   position: fixed;
   top: var(--header-h);

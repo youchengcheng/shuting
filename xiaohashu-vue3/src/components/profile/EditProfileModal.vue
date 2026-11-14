@@ -416,6 +416,7 @@ const handleConfirm = async () => {
     ? `${form.value.birthYear}-${form.value.birthMonth}-${form.value.birthDay}`
     : ''
   
+  const session = userStore.captureSession()
   try {
     // 准备提交的数据
     const profileData = {
@@ -436,6 +437,7 @@ const handleConfirm = async () => {
     
     // 调用 API 更新用户资料
     const res = await updateUserProfile(profileData)
+    if (!userStore.isCurrentSession(session)) return
     if (!res.success) {
       message.show(res.message || '更新失败，请重试')
       return
@@ -447,25 +449,28 @@ const handleConfirm = async () => {
     // 保证整页刷新后头部、侧边栏等位置拿到的是最新资料
     try {
       const profileRes = await getUserProfile()
+      if (!userStore.isCurrentSession(session)) return
       if (profileRes.success) {
-        userStore.setProfile(profileRes.data)
+        userStore.setProfile(profileRes.data, session)
       }
     } catch (err) {
       console.error('刷新用户资料出错:', err)
     }
 
     // 触发更新成功事件，通知父组件
-    emit('update-success', profileData)
+    if (!userStore.isCurrentSession(session)) return
+    emit('update-success', { ...profileData, session })
 
     // 关闭模态框
     emit('update:visible', false)
 
     // 资料更新成功后整页刷新，避免页面其他位置（头部、笔记列表等）仍展示旧的用户信息
     setTimeout(() => {
-      window.location.reload()
+      if (userStore.isCurrentSession(session)) window.location.reload()
     }, PROFILE_REFRESH_DELAY)
 
   } catch (error) {
+    if (!userStore.isCurrentSession(session)) return
     console.error('更新资料出错:', error)
     message.show('更新失败，请重试')
   }

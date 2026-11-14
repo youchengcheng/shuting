@@ -103,13 +103,18 @@ Cassandra note_content ─┘                                   +
 | 变量 | 说明 |
 | --- | --- |
 | `DASHSCOPE_API_KEY` | 阿里云百炼 API Key，**必填** |
-| `DASHSCOPE_BASE_URL` | 默认 `https://dashscope.aliyuncs.com/compatible-mode` |
+| `DASHSCOPE_BASE_URL` | 默认 `https://ws-ms4u3sopffjgsuxk.cn-beijing.maas.aliyuncs.com/compatible-mode`（末尾不要带 `/v1`） |
 | `DASHSCOPE_CHAT_MODEL` | 默认 `qwen-plus` |
 | `DASHSCOPE_EMBEDDING_MODEL` | 默认 `text-embedding-v4`（维度 1536，需与 `xiaohashu.ai.vector.dimensions` 一致） |
 | `XIAOHASHU_DB_*` | 业务 MySQL（127.0.0.1:3307/xiaohashu） |
 | `XIAOHASHU_VECTOR_DB_*` | pgvector 所在 PostgreSQL（127.0.0.1:5432/robot） |
 | `CASSANDRA_*` | Cassandra 连接（127.0.0.1:9042 / xiaohashu） |
 | `ROCKETMQ_NAME_SERVER` | 默认 `127.0.0.1:9876` |
+
+Spring AI 1.1.1 默认给聊天、向量接口分别追加 `/v1/chat/completions`、`/v1/embeddings`，
+因此 `spring.ai.openai.base-url`（包括环境变量 `DASHSCOPE_BASE_URL`）只填写到 `/compatible-mode`。
+若填写到 `/compatible-mode/v1`，实际请求会变成 `/compatible-mode/v1/v1/...`，导致两类接口都返回 404，
+即使站内检索降级为 AI 直答也会失败。修改后需重启 AI 服务；若通过环境变量或启动参数覆盖地址，须同步修正。
 
 > 注意：`rocketmq.name-server` 的前缀是 `rocketmq`，不是 `spring.rocketmq`；
 > 且 `RocketMQAutoConfiguration` 由 `config/RocketMQConfig` 显式 `@Import`

@@ -88,6 +88,10 @@ public class CommentServiceImpl implements CommentService {
     private CommentLikeDOMapper commentLikeDOMapper;
     @Resource
     private TransactionTemplate transactionTemplate;
+    @Resource
+    private com.quanxiaoha.xiaohashu.comment.biz.rpc.NoteAccessService noteAccessService;
+    @Resource
+    private com.quanxiaoha.xiaohashu.comment.biz.service.CommentReplyValidator replyValidator;
 
     /**
      * 评论详情本地缓存
@@ -114,6 +118,9 @@ public class CommentServiceImpl implements CommentService {
 
         //获取笔记发布者id
         Long userId = LoginUserContextHolder.getUserId();
+        com.quanxiaoha.xiaohashu.note.dto.NoteMetadataDTO note = noteAccessService.requireAccessible(publishCommentReqVO.getNoteId(), userId);
+        Long replyId = publishCommentReqVO.getReplyCommentId();
+        if (replyId != null && replyId > 0) replyValidator.requireTarget(publishCommentReqVO.getNoteId(), replyId);
         //调用分布式 id 生成服务
         String commentId = distributedIdGeneratorRpcService.generateCommentId();
 
@@ -121,6 +128,7 @@ public class CommentServiceImpl implements CommentService {
         //构建消息体 DTO
         PublishCommentMqDTO publishCommentMqDTO = PublishCommentMqDTO.builder()
                 .noteId(publishCommentReqVO.getNoteId())
+                .noteCreatorId(note.getCreatorId())
                 .content(content)
                 .imageUrl(imageUrl)
                 .replyCommentId(publishCommentReqVO.getReplyCommentId())
@@ -146,6 +154,7 @@ public class CommentServiceImpl implements CommentService {
     public PageResponse<FindCommentItemRspVO> findCommentPageList(FindCommentPageListReqVO findCommentPageListReqVO) {
         //笔记 id
         Long noteId = findCommentPageListReqVO.getNoteId();
+        noteAccessService.requireAccessible(noteId, LoginUserContextHolder.getUserId());
         //当前页码
         Integer pageNo = findCommentPageListReqVO.getPageNo();
         //每页展示一级评论数
@@ -237,6 +246,8 @@ public class CommentServiceImpl implements CommentService {
                 // 只有当本地缓存全部命中、且确实组装出了数据时，才直接响应返参；
                 // 否则继续往下走 Redis / 数据库回源，避免返回空列表
                 if(localCacheExpiredCommentIds.isEmpty() && CollUtil.isNotEmpty(commentRspVOS)) {
+                    commentRspVOS.sort(Comparator.comparing((FindCommentItemRspVO item) -> item.getHeat() == null ? 0D : item.getHeat())
+                            .reversed().thenComparing(FindCommentItemRspVO::getCommentId, Comparator.reverseOrder()));
                     setCommentCountData(commentRspVOS,localCacheExpiredCommentIds);
                     log.info("本次查询走的是本地缓存，查询的数据是：{}",commentRspVOS);
                     return PageResponse.success(commentRspVOS,pageNo,count,pageSize);
@@ -289,7 +300,7 @@ public class CommentServiceImpl implements CommentService {
             // Comparator<Object>（链式 .reversed() 会丢掉目标类型），导致编译报「找不到符号 getHeat」
             Comparator<FindCommentItemRspVO> heatDescComparator = Comparator.comparing(
                     (FindCommentItemRspVO commentRspVO) -> Objects.isNull(commentRspVO.getHeat()) ? 0D : commentRspVO.getHeat()
-            ).reversed();
+            ).reversed().thenComparing(FindCommentItemRspVO::getCommentId, Comparator.reverseOrder());
             commentRspVOS = commentRspVOS.stream()
                     .sorted(heatDescComparator)
                     .collect(Collectors.toList());
@@ -320,6 +331,11 @@ public class CommentServiceImpl implements CommentService {
     public PageResponse<FindChildCommentItemRspVO> findChildCommentPageList(FindChildCommentPageListReqVO findChildCommentPageListReqVO) {
         //父评论id
         Long parentCommentId = findChildCommentPageListReqVO.getParentCommentId();
+        CommentDO parent = commentDOMapper.selectByPrimaryKey(parentCommentId);
+        if (parent == null || !Objects.equals(parent.getLevel(), CommentLevelEnum.ONE.getCode()))
+            throw new BizException(ResponseCodeEnum.PARENT_COMMENT_NOT_FOUND);
+        replyValidator.requireRoot(parent.getNoteId(), parent);
+        noteAccessService.requireAccessible(parent.getNoteId(), LoginUserContextHolder.getUserId());
         //当前页码
         Integer pageNo = findChildCommentPageListReqVO.getPageNo();
         //每页展示的二级评论数（默认为6）
@@ -455,8 +471,10 @@ public class CommentServiceImpl implements CommentService {
         //当前登录用户id
         Long userId = LoginUserContextHolder.getUserId();
 
-        // 1. 校验被点赞的评论是否存在
-        checkCommentIsExist(commentId);
+        // Read authoritative routing before the asynchronous action; cached existence cannot identify the recipient.
+        CommentDO likedComment = commentDOMapper.selectByPrimaryKey(commentId);
+        if (likedComment == null) throw new BizException(ResponseCodeEnum.COMMENT_NOT_FOUND);
+        noteAccessService.requireAccessible(likedComment.getNoteId(), userId);
 
         // 2. 判断目标评论，是否已经被点赞
         //布隆过滤器key
@@ -517,6 +535,8 @@ public class CommentServiceImpl implements CommentService {
         //构建消息体 DTO
         LikeUnlikeCommentMqDTO likeUnlikeCommentMqDTO = LikeUnlikeCommentMqDTO.builder()
                 .commentId(commentId)
+                .commentCreatorId(likedComment.getUserId())
+                .noteId(likedComment.getNoteId())
                 .type(LikeUnlikeCommentTypeEnum.LIKE.getCode())
                 .userId(userId)
                 .createTime(LocalDateTime.now())

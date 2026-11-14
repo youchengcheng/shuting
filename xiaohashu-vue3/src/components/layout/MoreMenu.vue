@@ -2,24 +2,6 @@
   <Transition name="dropdown">
     <div v-if="visible" class="more-menu" role="menu">
       <button type="button" class="more-menu__item" role="menuitem" @click="openAbout">关于书亭</button>
-      <a
-        class="more-menu__item"
-        href="https://www.quanxiaoha.com/column/"
-        target="_blank"
-        rel="noopener noreferrer"
-        role="menuitem"
-      >
-        <span>犬小哈实战专栏</span>
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path
-            d="M7 17L17 7M17 7H9M17 7v8"
-            stroke="currentColor"
-            stroke-width="1.6"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-      </a>
 
       <template v-if="isLoggedIn">
         <div class="more-menu__divider"></div>
@@ -72,16 +54,18 @@ const openChangePassword = () => {
 }
 
 const handleLogout = () => {
+  const session = userStore.captureSession()
   logout().then((res) => {
+    if (!userStore.isCurrentSession(session)) return
     if (res.success) {
-      userStore.logout()
+      userStore.logout(session)
       message.show('已退出登录')
       onClose()
       router.push('/discover')
     } else {
       message.show(res.message || '退出登录失败')
     }
-  })
+  }).catch(() => {})
 }
 </script>
 
@@ -125,12 +109,6 @@ const handleLogout = () => {
 
 .more-menu__item--danger:hover {
   color: var(--color-ink);
-}
-
-.more-menu__item svg {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
 }
 
 .more-menu__divider {

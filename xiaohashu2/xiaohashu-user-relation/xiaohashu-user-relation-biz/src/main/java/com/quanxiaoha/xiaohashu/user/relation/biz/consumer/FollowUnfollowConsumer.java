@@ -59,6 +59,12 @@ public class FollowUnfollowConsumer implements RocketMQListener<Message> {
     private RedisTemplate<String,Object> redisTemplate;
     @Resource
     private RocketMQTemplate rocketMQTemplate;
+    @Resource
+    private com.quanxiaoha.xiaohashu.user.relation.biz.service.FollowNotificationPersistenceService followPersistenceService;
+    @Resource
+    private com.quanxiaoha.framework.notification.outbox.NotificationOutboxProperties notificationProperties;
+    @Resource
+    private com.quanxiaoha.framework.notification.outbox.NotificationEventIsolationWriter isolationWriter;
 
     @Override
     public void onMessage(Message message) {
@@ -85,7 +91,15 @@ public class FollowUnfollowConsumer implements RocketMQListener<Message> {
     private void handleFollowTagMessage(String bodyJsonStr) {
 
         //将消息体json字符串转为DTO 对象
-        FollowUserMqDTO followUserMqDTO = JsonUtils.parseObject(bodyJsonStr, FollowUserMqDTO.class);
+        FollowUserMqDTO followUserMqDTO;
+        try {
+            followUserMqDTO = JsonUtils.parseObject(bodyJsonStr, FollowUserMqDTO.class);
+            if (followUserMqDTO == null) throw new IllegalArgumentException("Missing follow payload");
+        } catch (Exception invalid) {
+            if (!notificationProperties.getEvents().isEnabled()) throw new IllegalArgumentException("Malformed source payload", invalid);
+            isolationWriter.save(MQConstants.TOPIC_FOLLOW_OR_UNFOLLOW, bodyJsonStr, "Malformed follow payload");
+            return;
+        }
 
         //判空
         if(Objects.isNull(followUserMqDTO)){
@@ -96,34 +110,21 @@ public class FollowUnfollowConsumer implements RocketMQListener<Message> {
         Long userId = followUserMqDTO.getUserId();
         Long followUserId = followUserMqDTO.getFollowingId();
         LocalDateTime createTime = followUserMqDTO.getCreateTime();
+        if (notificationProperties.getEvents().isEnabled() && createTime == null) {
+            isolationWriter.save(MQConstants.TOPIC_FOLLOW_OR_UNFOLLOW, bodyJsonStr, "Follow event has no source occurrence time");
+            log.warn("Isolated follow event without source time: actorId={}, targetId={}", userId, followUserId);
+            return;
+        }
+
+        if (notificationProperties.getEvents().isEnabled()
+                && (userId == null || userId <= 0 || followUserId == null || followUserId <= 0)) {
+            isolationWriter.save(MQConstants.TOPIC_FOLLOW_OR_UNFOLLOW, bodyJsonStr, "Invalid follow source identity");
+            return;
+        }
 
         //编程式提交事物
         //Boolean.TRUE.equals()判断返回的值是否为true
-        boolean isSuccess = Boolean.TRUE.equals(transactionTemplate.execute(status -> {
-            try {
-                //关注成功后向数据库添加两条记录
-                //关注表
-                int count = followingDOMapper.insert(FollowingDO.builder()
-                        .userId(userId)
-                        .followingUserId(followUserId)
-                        .createTime(createTime)
-                        .build());
-
-                //粉丝表
-                if (count > 0) {
-                    fansDOMapper.insert(FansDO.builder()
-                            .userId(followUserId)
-                            .fansUserId(userId)
-                            .createTime(createTime)
-                            .build());
-                }
-                return true;
-            } catch (Exception e) {
-                status.setRollbackOnly();//标记事物为回滚
-                log.error("", e);
-            }
-            return false;
-        }));
+        boolean isSuccess = followPersistenceService.persist(followUserMqDTO);
         log.info("## 数据库添加记录结果：{}", isSuccess);
 
         // 若数据库操作成功，更新 Redis 中被关注用户的 ZSet 粉丝列表

@@ -105,4 +105,7 @@
   </select>
 
 
+  <select id="selectRelationForUpdate" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" /> from t_fans where user_id=#{userId} and fans_user_id=#{targetId} for update
+  </select>
 </mapper>

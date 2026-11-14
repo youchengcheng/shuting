@@ -336,4 +336,8 @@
 
 
 
+  <select id="selectByIds" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" /> from t_note where id in
+    <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+  </select>
 </mapper>

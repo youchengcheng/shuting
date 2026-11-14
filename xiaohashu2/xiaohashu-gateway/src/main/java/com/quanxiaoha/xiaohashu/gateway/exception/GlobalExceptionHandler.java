@@ -2,7 +2,6 @@ package com.quanxiaoha.xiaohashu.gateway.exception;
 
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
-import cn.dev33.satoken.exception.SaTokenException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quanxiaoha.framework.common.response.Response;
 import com.quanxiaoha.xiaohashu.gateway.enums.ResponseCodeEnum;
@@ -10,6 +9,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
 import org.springframework.core.io.buffer.DataBufferFactory;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -22,6 +22,7 @@ import reactor.core.publisher.Mono;
  **/
 @Component
 @Slf4j
+@Order(-2)
 public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
 
     @Resource
@@ -31,6 +32,11 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
         // 获取响应对象
         ServerHttpResponse response = exchange.getResponse();
+        if (response.isCommitted()) {
+            return Mono.error(ex);
+        }
+
+        boolean notificationStream = "/notification/stream".equals(exchange.getRequest().getPath().value());
 
         log.error("==> 全局异常捕获: ", ex);
 
@@ -50,6 +56,10 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
             //构建响应结果
             result = Response.fail(ResponseCodeEnum.UNAUTHORIZED.getErrorCode(),ResponseCodeEnum.UNAUTHORIZED.getErrorMessage());
         }else {
+            // SSE 建连失败必须有可重试的 HTTP 状态，不能返回 200 JSON 伪装成流。
+            if (notificationStream) {
+                response.setStatusCode(HttpStatus.SERVICE_UNAVAILABLE);
+            }
             // 其他异常，则统一提示 “系统繁忙” 错误
             result = Response.fail(ResponseCodeEnum.SYSTEM_ERROR);
         }

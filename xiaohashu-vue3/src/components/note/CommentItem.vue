@@ -1,5 +1,5 @@
 <template>
-  <div ref="rootRef" class="comment-item" :class="{ 'comment-item--reply': isReply, 'new-comment-animation': comment.isNewComment }">
+  <div ref="rootRef" :data-comment-id="comment.commentId" :tabindex="isTarget ? -1 : undefined" class="comment-item" :class="{ 'comment-item--reply': isReply, 'new-comment-animation': comment.isNewComment, 'comment-item--target': isTarget }">
     <img :src="comment.avatar" class="comment-item__avatar" :alt="comment.nickname" />
 
     <div class="comment-item__body" :class="{ 'comment-item__body--has-more': canDelete }">
@@ -86,19 +86,25 @@
       </div>
 
       <!-- 子评论区域 -->
-      <template v-if="comment.childCommentTotal > 0">
+      <template v-if="comment.childCommentTotal > 0 || comment.childComments?.length">
         <div v-if="comment.childComments && comment.childComments.length > 0" class="comment-item__children">
-          <CommentItem
-            v-for="(childComment, index) in comment.childComments"
-            :key="index"
-            :comment="childComment"
-            :is-reply="true"
-            :current-user-id="currentUserId"
-            @reply="$emit('reply', $event)"
-            @like="$emit('like', $event)"
-            @delete="$emit('delete', $event)"
-          />
+          <template v-for="section in childSections" :key="section.pageNo">
+            <button v-if="section.firstMissingPage" type="button" class="comment-item__more" :disabled="comment.isLoadingChildComments" @click="handleExpandReplies(comment, section.firstMissingPage)">查看更多回复</button>
+            <CommentItem
+              v-for="childComment in section.comments"
+              :key="childComment.commentId"
+              :comment="childComment"
+              :is-reply="true"
+              :current-user-id="currentUserId"
+              :target-comment-id="targetCommentId"
+              @reply="$emit('reply', $event)"
+              @like="$emit('like', $event)"
+              @delete="$emit('delete', $event)"
+            />
+          </template>
         </div>
+
+        <p v-if="comment.childCommentError" class="comment-item__reply-error" role="status">{{ comment.childCommentError }}</p>
 
         <button
           v-if="
@@ -108,9 +114,10 @@
           "
           type="button"
           class="comment-item__more"
+          :disabled="comment.isLoadingChildComments"
           @click="handleExpandReplies(comment)"
         >
-          {{ comment.childComments?.length > 1 ? '展开更多回复' : `展开 ${comment.childCommentTotal - 1} 条回复` }}
+          {{ comment.isLoadingChildComments ? '正在加载回复…' : comment.childCommentError ? '重试加载回复' : comment.childComments?.length > 1 ? '展开更多回复' : `展开 ${comment.childCommentTotal - 1} 条回复` }}
         </button>
       </template>
     </div>
@@ -121,8 +128,10 @@
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import ImagePreview from '@/components/common/ImagePreview.vue'
 import UserPopover from '@/components/common/UserPopover.vue'
+import { commentPageSections } from '@/utils/commentContext'
 
 const props = defineProps({
+  targetCommentId: { type: String, default: '' },
   comment: {
     type: Object,
     required: true
@@ -139,12 +148,13 @@ const props = defineProps({
 })
 
 const showPreview = ref(false)
-const isLiked = ref(false)
-const localLikes = ref(Number(props.comment.likeTotal) || 0)
+const isLiked = computed(() => !!props.comment.liked)
+const isTarget = computed(() => String(props.comment.commentId) === props.targetCommentId)
+const childSections = computed(() => commentPageSections(props.comment.childPaging, props.comment.childComments || []))
 
 // 计算显示的点赞数
 const displayLikes = computed(() => {
-  return isLiked.value ? localLikes.value + 1 : localLikes.value
+  return Number(props.comment.likeTotal) || 0
 })
 
 // 修改 emit 定义，添加 like 事件
@@ -208,9 +218,8 @@ onBeforeUnmount(() => {
 
 // 修改点赞切换函数
 const toggleLike = () => {
-  isLiked.value = !isLiked.value
   // 触发点赞事件，传递整个 comment 对象和点赞状态
-  emit('like', { comment: props.comment, liked: isLiked.value })
+  emit('like', { comment: props.comment, liked: !isLiked.value })
 }
 
 // 点击回复
@@ -219,8 +228,8 @@ const onReplyClick = () => {
 }
 
 // 添加展开回复的点击处理
-const handleExpandReplies = (comment) => {
-  emit('expand-replies', comment)
+const handleExpandReplies = (comment, pageNo) => {
+  emit('expand-replies', pageNo ? { comment, pageNo } : comment)
 }
 </script>
 
@@ -230,6 +239,7 @@ const handleExpandReplies = (comment) => {
   gap: 12px;
   padding: 10px 0;
 }
+.comment-item--target { border-radius: var(--radius-control); background: var(--color-canvas-sunken); outline: 1px solid var(--color-line-strong); outline-offset: 4px; scroll-margin-block: 24px; }
 
 .comment-item--reply {
   padding: 6px 0;
@@ -293,6 +303,7 @@ const handleExpandReplies = (comment) => {
 .comment-item__image img {
   margin-top: 8px;
   width: 120px;
+  height: 120px;
   border-radius: var(--radius-control);
   object-fit: cover;
   cursor: zoom-in;
@@ -465,6 +476,8 @@ const handleExpandReplies = (comment) => {
 .comment-item__more:hover {
   color: var(--color-ink);
 }
+.comment-item__more:disabled { cursor: default; opacity: 0.6; }
+.comment-item__reply-error { margin-top: 8px; color: var(--color-ink-soft); font-size: 13px; line-height: 1.5; }
 
 @keyframes like {
   0% {

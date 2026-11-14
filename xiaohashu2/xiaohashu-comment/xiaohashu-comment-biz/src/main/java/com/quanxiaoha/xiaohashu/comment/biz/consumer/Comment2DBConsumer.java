@@ -13,7 +13,6 @@ import com.quanxiaoha.xiaohashu.comment.biz.enums.CommentLevelEnum;
 import com.quanxiaoha.xiaohashu.comment.biz.model.bo.CommentBO;
 import com.quanxiaoha.xiaohashu.comment.biz.model.dto.CountPublishCommentMqDTO;
 import com.quanxiaoha.xiaohashu.comment.biz.model.dto.PublishCommentMqDTO;
-import com.quanxiaoha.xiaohashu.comment.biz.rpc.KeyValueRpcService;
 import com.quanxiaoha.xiaohashu.kv.api.KeyValueFeignApi;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
@@ -40,7 +39,6 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scripting.support.ResourceScriptSource;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -55,15 +53,16 @@ public class Comment2DBConsumer {
     @Resource
     private CommentDOMapper commentDOMapper;
     @Resource
-    private TransactionTemplate transactionTemplate;
-    @Resource
-    private KeyValueRpcService keyValueRpcService;
-    @Resource
     private RocketMQTemplate rocketMQTemplate;
     @Value("${rocketmq.name-server}")
     private String namesrvAddr;
     @Resource
     private RedisTemplate<String,Object> redisTemplate;
+    @Resource private com.quanxiaoha.xiaohashu.comment.biz.service.CommentNotificationPersistenceService notificationPersistence;
+    @Resource private com.quanxiaoha.xiaohashu.comment.biz.service.CommentReplyValidator replyValidator;
+    @Resource private com.quanxiaoha.xiaohashu.comment.biz.rpc.NoteAccessService noteAccessService;
+    @Resource private com.quanxiaoha.framework.notification.outbox.NotificationOutboxProperties notificationProperties;
+    @Resource private com.quanxiaoha.framework.notification.outbox.NotificationEventIsolationWriter isolationWriter;
 
     private DefaultMQPushConsumer consumer;
 
@@ -94,7 +93,14 @@ public class Comment2DBConsumer {
         consumer.setConsumeMessageBatchMaxSize(30);
 
         //注册消息监听器
-        consumer.registerMessageListener((MessageListenerConcurrently) (msgs,context) -> {
+        consumer.registerMessageListener((MessageListenerConcurrently) (msgs, context) -> consume(msgs));
+
+        //启动消费者
+        consumer.start();
+        return consumer;
+    }
+
+    public ConsumeConcurrentlyStatus consume(List<MessageExt> msgs) {
             log.info("==> 本批次消息大小: {}", msgs.size());
             try {
                 //令牌统控流
@@ -103,11 +109,19 @@ public class Comment2DBConsumer {
                 //消息体 json 字符串转为 DTO
                 //将所有一级评论存入集合
                 List<PublishCommentMqDTO> publishCommentMqDTOS = Lists.newArrayList();
-                msgs.forEach(msg -> {
-                    String msgJson = new String(msg.getBody());//msg.getBody()拿到原始二进制数据\
-                    log.info("==> Consumer - Received message: {}", msgJson);
-                    publishCommentMqDTOS.add(JsonUtils.parseObject(msgJson, PublishCommentMqDTO.class));
-                });
+                Map<PublishCommentMqDTO, String> originalPayloads = new IdentityHashMap<>();
+                Map<PublishCommentMqDTO, Integer> retryCounts = new IdentityHashMap<>();
+                for (MessageExt msg : msgs) {
+                    String msgJson = new String(msg.getBody(), java.nio.charset.StandardCharsets.UTF_8);
+                    try {
+                        PublishCommentMqDTO dto = JsonUtils.parseObject(msgJson, PublishCommentMqDTO.class);
+                        if (dto == null) throw new IllegalArgumentException("Missing comment payload");
+                        publishCommentMqDTOS.add(dto); originalPayloads.put(dto, msgJson); retryCounts.put(dto, msg.getReconsumeTimes());
+                    } catch (Exception invalid) {
+                        if (!notificationProperties.getEvents().isEnabled()) throw new IllegalArgumentException("Malformed source payload", invalid);
+                        isolationWriter.save(MQConstants.TOPIC_PUBLISH_COMMENT, msgJson, "Malformed comment payload");
+                    }
+                }
 
                 //提取所有不为空的回复评论id
                 List<Long> replyCommentIds = publishCommentMqDTOS.stream()
@@ -128,15 +142,55 @@ public class Comment2DBConsumer {
                             .toMap(CommentDO::getId,commentDO -> commentDO));
                 }
 
-                // 回复目标尚未落库时等待下一次消费，避免把二级评论静默降级成一级评论
-                for (PublishCommentMqDTO publishCommentMqDTO : publishCommentMqDTOS) {
-                    Long replyCommentId = publishCommentMqDTO.getReplyCommentId();
-                    if (Objects.nonNull(replyCommentId)
-                            && replyCommentId > 0
-                            && !commentIdAndCommentDOMap.containsKey(replyCommentId)) {
-                        log.warn("==> 回复目标评论尚未落库，稍后重试。replyCommentId: {}, commentId: {}",
-                                replyCommentId, publishCommentMqDTO.getCommentId());
-                        return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+                // Validate authoritative reply/root/note relationships. Missing async targets get bounded retries.
+                Map<Long, CommentDO> existingComments = new HashMap<>();
+                Iterator<PublishCommentMqDTO> candidates = publishCommentMqDTOS.iterator();
+                while (candidates.hasNext()) {
+                    PublishCommentMqDTO dto = candidates.next();
+                    if (notificationProperties.getEvents().isEnabled() && dto.getCreateTime() == null) {
+                        isolationWriter.save(MQConstants.TOPIC_PUBLISH_COMMENT, originalPayloads.get(dto), "Comment event has no source occurrence time");
+                        log.warn("Isolated comment event without source time: commentId={}, noteId={}", dto.getCommentId(), dto.getNoteId());
+                        candidates.remove();
+                        continue;
+                    }
+                    if (notificationProperties.getEvents().isEnabled()
+                            && (dto.getCommentId() == null || dto.getCommentId() <= 0 || dto.getNoteId() == null || dto.getNoteId() <= 0
+                                || dto.getCreatorId() == null || dto.getCreatorId() <= 0
+                                || (dto.getReplyCommentId() != null && dto.getReplyCommentId() < 0)
+                                || (dto.getNoteCreatorId() != null && dto.getNoteCreatorId() <= 0))) {
+                        isolationWriter.save(MQConstants.TOPIC_PUBLISH_COMMENT, originalPayloads.get(dto), "Invalid comment source identity or routing");
+                        candidates.remove();
+                        continue;
+                    }
+                    CommentDO existing = commentDOMapper.selectByPrimaryKey(dto.getCommentId());
+                    if (existing != null) {
+                        if (notificationProperties.getEvents().isEnabled()
+                                && (!Objects.equals(existing.getNoteId(), dto.getNoteId()) || !Objects.equals(existing.getUserId(), dto.getCreatorId()))) {
+                            isolationWriter.save(MQConstants.TOPIC_PUBLISH_COMMENT, originalPayloads.get(dto), "Comment ID conflicts with persisted ownership");
+                            candidates.remove();
+                            continue;
+                        }
+                        existingComments.put(existing.getId(), existing);
+                        continue;
+                    }
+                    Long replyId = dto.getReplyCommentId();
+                    if (replyId != null && replyId > 0 && !commentIdAndCommentDOMap.containsKey(replyId)) {
+                        int retries = retryCounts.get(dto);
+                        if (retries < 5) return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+                        isolationWriter.save(MQConstants.TOPIC_PUBLISH_COMMENT, originalPayloads.get(dto), "Reply target missing after five retries");
+                        log.warn("Isolated comment event after bounded missing-target retries: commentId={}, replyId={}", dto.getCommentId(), replyId);
+                        candidates.remove();
+                        continue;
+                    }
+                    try {
+                        if (replyId != null && replyId > 0) replyValidator.requireRoot(dto.getNoteId(), commentIdAndCommentDOMap.get(replyId));
+                        if (dto.getNoteCreatorId() == null)
+                            dto.setNoteCreatorId(noteAccessService.requireAccessible(dto.getNoteId(), dto.getCreatorId()).getCreatorId());
+                    } catch (com.quanxiaoha.framework.common.exception.BizException invalid) {
+                        // Permanently invalid legacy routing and cross-note replies are rejected individually.
+                        isolationWriter.save(MQConstants.TOPIC_PUBLISH_COMMENT, originalPayloads.get(dto), "Invalid authoritative comment routing");
+                        log.warn("Isolated invalid comment routing: commentId={}, noteId={}, replyId={}", dto.getCommentId(), dto.getNoteId(), replyId);
+                        candidates.remove();
                     }
                 }
 
@@ -164,7 +218,7 @@ public class Comment2DBConsumer {
                     //评论内容若不为空
                     String content = publishCommentMqDTO.getContent();
                     if (StringUtils.isNotBlank(content)) {
-                        commentBO.setContentUuid(UUID.randomUUID().toString());//笔记标识
+                        commentBO.setContentUuid(com.quanxiaoha.xiaohashu.comment.biz.service.CommentNotificationPersistenceService.contentUuid(commentBO.getId()));
                         commentBO.setIsContentEmpty(false);
                         commentBO.setContent(content);
                     }
@@ -189,33 +243,21 @@ public class Comment2DBConsumer {
                             commentBO.setReplyUserId(replyCommentDO.getUserId());
                         }
                     }
+                    // Preserve the persisted hierarchy of duplicate rows even if their reply target was later deleted.
+                    CommentDO existing = existingComments.get(commentBO.getId());
+                    if (existing != null) {
+                        commentBO.setLevel(existing.getLevel()); commentBO.setParentId(existing.getParentId());
+                        commentBO.setReplyCommentId(existing.getReplyCommentId()); commentBO.setReplyUserId(existing.getReplyUserId());
+                    }
                     commentBOS.add(commentBO);
                 }
 
                 log.info("## 清洗后的 CommentBOS: {}", JsonUtils.toJsonString(commentBOS));
 
                 //编程式事物，保证整体操作的原子性
-                Integer insertedRows = transactionTemplate.execute(status -> {
-                    try {
-                        //先批量存入评论元数据
-                        int count = commentDOMapper.batchInsert(commentBOS);
-                        //过滤出评论内容不为空的 BO
-                        List<CommentBO> commentContentNotEmptyBOS = commentBOS.stream()
-                                .filter(commentBO -> Boolean.FALSE.equals(commentBO.getIsContentEmpty()))
-                                .toList();
-
-                        if (CollUtil.isNotEmpty(commentContentNotEmptyBOS)) {
-                            //批量写入评论内容
-                            keyValueRpcService.batchSaveCommentContent(commentContentNotEmptyBOS);
-                        }
-
-                        return count;
-                    } catch (Exception e) {
-                        status.setRollbackOnly();//标记事物回滚
-                        log.error("", e);
-                        throw e;
-                    }
-                });
+                Map<Long, PublishCommentMqDTO> sourceById = publishCommentMqDTOS.stream()
+                        .collect(Collectors.toMap(PublishCommentMqDTO::getCommentId, source -> source, (first, repeated) -> first));
+                Integer insertedRows = notificationPersistence.persist(commentBOS, sourceById);
 
                 //如果插入的行数大于0
                 if(Objects.nonNull(insertedRows) && insertedRows > 0){
@@ -257,11 +299,6 @@ public class Comment2DBConsumer {
                 // 手动 ACK，告诉 RocketMQ 这批次消息消费失败
                 return ConsumeConcurrentlyStatus.RECONSUME_LATER;
             }
-        });
-
-        //启动消费者
-        consumer.start();
-        return consumer;
     }
 
     /*

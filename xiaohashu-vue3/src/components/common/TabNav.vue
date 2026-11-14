@@ -1,6 +1,7 @@
 <template>
   <div class="tab-nav">
-    <div class="tab-list" role="tablist">
+    <div ref="tabList" class="tab-list" :class="{ 'tab-list--animated': animate && indicator.width }" role="tablist">
+      <span v-if="animate && indicator.width" class="tab-indicator" :style="indicatorStyle" aria-hidden="true"></span>
       <button
         v-for="tab in tabs"
         :key="tab.key"
@@ -9,6 +10,7 @@
         class="tab-item"
         :class="{ active: modelValue === tab.key }"
         :aria-selected="modelValue === tab.key"
+        :aria-label="tab.count ? `${tab.label}，${tab.count}条未读` : tab.label"
         @click="$emit('update:modelValue', tab.key)"
       >
         <span v-if="tab.icon" class="tab-item__icon" aria-hidden="true">
@@ -34,13 +36,14 @@
           </svg>
         </span>
         <span class="tab-text">{{ tab.label }}</span>
+        <span v-if="tab.count > 0" class="tab-count st-num" aria-hidden="true">{{ tab.count > 99 ? '99+' : tab.count }}</span>
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   tabs: {
@@ -50,10 +53,38 @@ const props = defineProps({
   modelValue: {
     type: String,
     required: true
+  },
+  animate: {
+    type: Boolean,
+    default: false
   }
 })
 
 defineEmits(['update:modelValue'])
+const tabList = ref(null)
+const indicator = ref({ left: 0, top: 0, width: 0, height: 0 })
+const indicatorStyle = computed(() => ({
+  transform: `translate(${indicator.value.left}px, ${indicator.value.top}px)`,
+  width: `${indicator.value.width}px`,
+  height: `${indicator.value.height}px`
+}))
+let resizeObserver
+const updateIndicator = () => {
+  if (!props.animate) return
+  const selected = tabList.value?.querySelector('.tab-item.active')
+  indicator.value = selected
+    ? { left: selected.offsetLeft, top: selected.offsetTop, width: selected.offsetWidth, height: selected.offsetHeight }
+    : { left: 0, top: 0, width: 0, height: 0 }
+}
+watch(() => [props.modelValue, props.tabs, props.animate], updateIndicator, { deep: true, flush: 'post' })
+onMounted(() => {
+  updateIndicator()
+  if (!props.animate) return
+  resizeObserver = new ResizeObserver(updateIndicator)
+  resizeObserver.observe(tabList.value)
+  tabList.value.querySelectorAll('.tab-item').forEach(button => resizeObserver.observe(button))
+})
+onBeforeUnmount(() => resizeObserver?.disconnect())
 </script>
 
 <style scoped>
@@ -63,12 +94,26 @@ defineEmits(['update:modelValue'])
 }
 
 .tab-list {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+.tab-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  pointer-events: none;
+  transition:
+    transform var(--motion-base) var(--ease-standard),
+    width var(--motion-base) var(--ease-standard);
+}
+
 .tab-item {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -96,9 +141,22 @@ defineEmits(['update:modelValue'])
   font-weight: 500;
 }
 
+.tab-list--animated .tab-item.active,
+.tab-list--animated .tab-item:hover {
+  background: transparent;
+}
+
+.tab-list--animated .tab-item:active {
+  color: var(--color-brand-hover);
+}
+
 .tab-item__icon svg {
   display: block;
   width: 18px;
   height: 18px;
+}
+.tab-count { min-width: 18px; padding: 1px 5px; border-radius: var(--radius-pill); color: var(--color-brand-hover); background: var(--color-paper); font-size: 12px; line-height: 1.4; }
+@media (prefers-reduced-motion: reduce) {
+  .tab-indicator { transition: none; }
 }
 </style>

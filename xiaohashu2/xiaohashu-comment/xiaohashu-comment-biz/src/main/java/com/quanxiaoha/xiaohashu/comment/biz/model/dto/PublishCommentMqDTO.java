@@ -16,6 +16,9 @@ import java.time.LocalDateTime;
 @Builder
 public class PublishCommentMqDTO {
 
+    private Long noteCreatorId;
+
+
     private Long noteId;
 
     /**

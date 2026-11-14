@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import BasicLayout from '@/layouts/BasicLayout.vue'
+import { PROFILE_ROUTE_PATH } from '@/utils/profileSession'
 
 // 笔记详情浮层：作为信息流 / 个人页 / 搜索页的子路由渲染
 // 打开时底层页面保持挂载，关闭时只卸载浮层，因此返回后不会重新请求数据
@@ -29,10 +30,11 @@ const router = createRouter({
         {
           path: '/notifications',
           name: 'Notifications',
-          component: () => import('@/views/Notifications.vue')
+          component: () => import('@/views/Notifications.vue'),
+          children: [{ path: 'note/:noteId', name: 'NotificationNoteDetail', component: NoteDetailOverlay, props: true }]
         },
         {
-          path: '/user/profile/:userId',
+          path: PROFILE_ROUTE_PATH,
           name: 'Profile',
           component: () => import('@/views/Profile.vue'),
           children: [

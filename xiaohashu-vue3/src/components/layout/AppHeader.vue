@@ -42,6 +42,10 @@
         </button>
       </form>      <!-- 右侧：AI 助手快捷操作 + 账号 -->
       <div class="actions">
+        <router-link to="/notifications" class="header-notification" :aria-label="notificationStore.summary.totalUnread ? `通知，${notificationStore.summary.totalUnread}条未读` : '通知'">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.7 21a2 2 0 0 1-3.4 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span v-if="notificationStore.summary.totalUnread > 0" class="notification-badge st-num" aria-hidden="true">{{ notificationStore.summary.totalUnread > 99 ? '99+' : notificationStore.summary.totalUnread }}</span>
+        </router-link>
         <div v-if="isAiPage" class="ai-actions">
           <button type="button" class="ai-chip-btn" :disabled="aiStore.rebuilding" @click="aiStore.triggerRebuild()">
             {{ aiStore.rebuilding ? '重建索引中…' : '重建索引' }}
@@ -96,6 +100,8 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAiStore } from '@/stores/ai'
+import { useNotificationStore } from '@/stores/notification'
+import { ownProfilePath } from '@/utils/profileSession'
 import BrandLogo from '@/components/common/BrandLogo.vue'
 import { logout } from '@/api/auth'
 import { message } from '@/utils/message'
@@ -105,6 +111,7 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const aiStore = useAiStore()
+const notificationStore = useNotificationStore()
 
 const showLoginModal = inject('showLoginModal')
 
@@ -137,22 +144,22 @@ const showLogin = () => {
 
 const goProfile = () => {
   menuOpen.value = false
-  const userId = profile.value.userId
-  if (!userId) return
-  router.push(`/user/profile/${userId}`)
+  router.push(ownProfilePath(profile.value))
 }
 
 const handleLogout = () => {
+  const session = userStore.captureSession()
   menuOpen.value = false
   logout().then((res) => {
+    if (!userStore.isCurrentSession(session)) return
     if (res.success) {
-      userStore.logout()
+      userStore.logout(session)
       message.show('已退出登录')
       router.push('/discover')
     } else {
       message.show(res.message || '退出登录失败')
     }
-  })
+  }).catch(() => {})
 }
 
 const handleClickOutside = (event) => {
@@ -178,6 +185,10 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.header-notification { position: relative; display: none; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; color: var(--color-ink); border-radius: var(--radius-pill); }
+.header-notification svg { width: 22px; height: 22px; }
+.header-notification .notification-badge { position: absolute; top: 0; right: -5px; }
+@media (max-width: 1023px) { .header-notification { display: inline-flex; } }
 .app-header {
   position: fixed;
   top: 0;
@@ -206,6 +217,7 @@ onBeforeUnmount(() => {
 }
 
 .search {
+  min-width: 0;
   position: relative;
   display: flex;
   align-items: center;
@@ -502,6 +514,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 767px) {
   .app-header__inner {
+    gap: 10px;
     padding: 0 16px;
   }
 
@@ -509,5 +522,6 @@ onBeforeUnmount(() => {
     height: 40px;
     padding-left: 16px;
   }
+  .actions { flex-shrink: 0; gap: 8px; }
 }
 </style>

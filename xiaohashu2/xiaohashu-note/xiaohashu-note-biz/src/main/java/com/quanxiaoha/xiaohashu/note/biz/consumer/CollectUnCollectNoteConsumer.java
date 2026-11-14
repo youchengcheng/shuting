@@ -1,6 +1,13 @@
 package com.quanxiaoha.xiaohashu.note.biz.consumer;
 
 import com.google.common.util.concurrent.RateLimiter;
+import com.quanxiaoha.framework.notification.outbox.NotificationOutboxProperties;
+import com.quanxiaoha.xiaohashu.notification.api.dto.*;
+import com.quanxiaoha.xiaohashu.notification.api.outbox.NotificationOutboxWriter;
+import com.quanxiaoha.xiaohashu.note.biz.domain.dataobject.NoteDO;
+import com.quanxiaoha.xiaohashu.note.biz.domain.mapper.NoteDOMapper;
+import org.springframework.transaction.support.TransactionTemplate;
+import java.util.List;
 import com.quanxiaoha.framework.common.util.JsonUtils;
 import com.quanxiaoha.xiaohashu.note.biz.constant.MQConstants;
 import com.quanxiaoha.xiaohashu.note.biz.domain.dataobject.NoteCollectionDO;
@@ -36,6 +43,11 @@ public class CollectUnCollectNoteConsumer implements RocketMQListener<Message> {
     private NoteCollectionDOMapper noteCollectionDOMapper;
     @Resource
     private RocketMQTemplate rocketMQTemplate;
+    @Resource private TransactionTemplate transactionTemplate;
+    @Resource private NotificationOutboxWriter notificationOutboxWriter;
+    @Resource private NotificationOutboxProperties notificationProperties;
+    @Resource private NoteDOMapper noteDOMapper;
+    @Resource private com.quanxiaoha.framework.notification.outbox.NotificationEventIsolationWriter isolationWriter;
 
     // 每秒创建 5000 个令牌
     private RateLimiter rateLimiter = RateLimiter.create(5000);
@@ -68,7 +80,15 @@ public class CollectUnCollectNoteConsumer implements RocketMQListener<Message> {
      */
     private void handleCollectNoteTagMessage(String bodyJsonStr) {
         // 消息体 JSON 字符串转 DTO
-        CollectUnCollectNoteMqDTO collectUnCollectNoteMqDTO = JsonUtils.parseObject(bodyJsonStr, CollectUnCollectNoteMqDTO.class);
+        CollectUnCollectNoteMqDTO collectUnCollectNoteMqDTO;
+        try {
+            collectUnCollectNoteMqDTO = JsonUtils.parseObject(bodyJsonStr, CollectUnCollectNoteMqDTO.class);
+            if (collectUnCollectNoteMqDTO == null) throw new IllegalArgumentException("Missing collection payload");
+        } catch (Exception invalid) {
+            if (!notificationProperties.getEvents().isEnabled()) throw new IllegalArgumentException("Malformed source payload", invalid);
+            isolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Malformed collection payload");
+            return;
+        }
 
         if (Objects.isNull(collectUnCollectNoteMqDTO)) return;
 
@@ -80,6 +100,17 @@ public class CollectUnCollectNoteConsumer implements RocketMQListener<Message> {
         Integer type = collectUnCollectNoteMqDTO.getType();
         // 收藏时间
         LocalDateTime createTime = collectUnCollectNoteMqDTO.getCreateTime();
+        if (notificationProperties.getEvents().isEnabled() && createTime == null) {
+            isolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Collection event has no source occurrence time");
+            log.warn("Isolated collection event without source time: actorId={}, noteId={}", userId, noteId);
+            return;
+        }
+
+        if (notificationProperties.getEvents().isEnabled()
+                && (userId == null || userId <= 0 || noteId == null || noteId <= 0 || !Objects.equals(type, 1))) {
+            isolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Invalid collection source identity or action");
+            return;
+        }
 
         // 构建 DO 对象
         NoteCollectionDO noteCollectionDO = NoteCollectionDO.builder()
@@ -90,7 +121,33 @@ public class CollectUnCollectNoteConsumer implements RocketMQListener<Message> {
                 .build();
 
         // 添加或更新笔记收藏记录
-        int count = noteCollectionDOMapper.insertOrUpdate(noteCollectionDO);
+        Integer insertedRows = transactionTemplate.execute(status -> {
+            // Notification transition is independent from MySQL upsert's affected-row counting.
+            boolean capture = notificationProperties.accepts(createTime);
+            NoteCollectionDO previous = capture ? noteCollectionDOMapper.selectRelationForUpdate(userId, noteId) : null;
+            int updated = noteCollectionDOMapper.insertOrUpdate(noteCollectionDO);
+            if (capture && Objects.equals(type, 1)
+                    && (previous == null || Objects.equals(previous.getStatus(), 0))) {
+                Long creatorId = collectUnCollectNoteMqDTO.getNoteCreatorId();
+                if (creatorId == null) {
+                    NoteDO note = noteDOMapper.selectByPrimaryKey(noteId);
+                    creatorId = note == null ? null : note.getCreatorId();
+                }
+                if (creatorId == null) {
+                    // Legacy event without recoverable routing cannot create a fabricated historical recipient.
+                    isolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Legacy collection has no recoverable note owner");
+                    log.warn("Isolated notification routing for legacy collection: actorId={}, noteId={}", userId, noteId);
+                } else if (!Objects.equals(creatorId, userId)) {
+                    notificationOutboxWriter.save(NotificationEvent.builder()
+                            .producerService("xiaohashu-note").type("NOTE_COLLECT")
+                            .businessKey(NotificationBusinessKey.of("NOTE_COLLECT", userId, noteId))
+                            .actorId(userId).noteId(noteId).occurredAt(createTime)
+                            .recipients(List.of(NotificationRecipient.builder().userId(creatorId).role("OWNER").build())).build());
+                }
+            }
+            return updated;
+        });
+        int count = insertedRows == null ? 0 : insertedRows;
 
         if (count == 0) return;
 

@@ -1,5 +1,13 @@
 <template>
   <div class="profile-page">
+    <EmptyState v-if="isOwnProfile && !isLoggedIn" title="登录后查看我的主页" description="登录后可以查看你的资料和笔记">
+      <button type="button" class="st-btn st-btn-primary" @click="showLoginModal = true">登录</button>
+    </EmptyState>
+    <div v-else-if="profileState.loading" class="profile-load-status" role="status">正在加载个人资料…</div>
+    <EmptyState v-else-if="profileState.error" title="个人资料加载失败" :description="profileState.error">
+      <button type="button" class="st-btn st-btn-ghost" @click="loadProfile">重新加载</button>
+    </EmptyState>
+    <template v-else>
     <!-- 背景图：仅当用户设置过背景图时渲染，自上而下逐渐透明 -->
     <div v-if="profile.backgroundImg" class="profile-bg" aria-hidden="true">
       <div class="profile-bg__layer" :style="{ backgroundImage: `url(${profile.backgroundImg})` }"></div>
@@ -20,7 +28,7 @@
           <!-- 右侧按钮组 -->
           <div class="profile-actions">
             <button 
-              v-if="!userStore.token || userStore.profile.userId !== profile.userId"
+              v-if="!isSelf"
               @click="handleFollow"
               :class="followStatus > 0 ? 'st-btn-ghost' : 'st-btn-primary'"
               class="st-btn w-[96px]">
@@ -47,7 +55,7 @@
                   class="profile-dropdown absolute right-0 mt-2 w-[160px] bg-paper rounded-card shadow-panel p-2 z-50 border border-line"
                 >
                   <button 
-                    v-if="!userStore.token || userStore.profile.userId === profile.userId"
+                    v-if="isSelf"
                     class="w-full px-4 py-2 text-left text-ink-soft hover:text-ink 
                     hover:bg-canvas-sunken flex items-center rounded-lg cursor-pointer"
                     @click="editProfile"
@@ -170,11 +178,12 @@
     <!-- 笔记详情浮层：以子路由渲染，关闭时只卸载浮层，当前主页不会重新加载。
          展开 / 收起动画由浮层自己驱动（见 composables/noteMorph.js） -->
     <router-view />
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, inject } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, watch, inject } from 'vue'
 import TabNav from '@/components/common/TabNav.vue'
 import NoteWaterfall from '@/components/note/NoteWaterfall.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -195,6 +204,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { followUser, unfollowUser, isFollowedUser } from '@/api/relation'
 import { message } from '@/utils/message'
 import { useNoteTransition } from '@/composables/noteTransition'
+import { createProfileLoader, emptyProfileState, profileUserId } from '@/utils/profileSession'
 
 const userStore = useUserStore()
 const route = useRoute()
@@ -272,7 +282,10 @@ const handleClickOutside = (event) => {
   }
 }
 
-const profile = ref({})
+const profileState = reactive(emptyProfileState())
+const profile = computed({ get: () => profileState.profile, set: value => { profileState.profile = value || {} } })
+const isOwnProfile = computed(() => profileUserId(route.params.userId) === undefined)
+const profileLoader = createProfileLoader(profileState, getUserProfile, userStore)
 const followStatus = ref(0)
 
 // Tab 导航配置：与小红书一致（笔记 / 点赞 / 收藏）；“笔记”数量使用后端返回的真实数据
@@ -303,6 +316,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  profileLoader.invalidate()
+  loadSeq += 1
   document.removeEventListener('click', handleClickOutside)
   window.removeEventListener('scroll', handleScroll)
 })
@@ -317,9 +332,9 @@ const loadingMore = ref(false) // 追加加载：底部加载行
 // - “笔记”tab：已登录时调用已发布笔记接口，使用游标分页（后端每页最多返回 20 条）
 // - 未登录的“笔记”tab、“赞过 / 收藏”tab：沿用页码分页接口（每页 10 条）
 const loadNotes = (isFirstPage = true) => {
-  if (isLoading.value) return
+  if (isLoading.value || profileState.loading || !profile.value.userId) return
 
-  const userId = Number(route.params.userId) || profile.value.userId
+  const userId = profileUserId(route.params.userId) || profile.value.userId
   if (!userId) return
 
   if (isFirstPage) {
@@ -611,10 +626,13 @@ const refreshFollowStatus = (userId) => {
 
 // 处理个人资料更新成功的回调
 const handleProfileUpdated = (updatedProfile) => {
+  if (!userStore.isCurrentSession(updatedProfile?.session)) return
+  const targetUserId = route.params.userId
+  const session = userStore.captureSession()
   // 更新本地的 profile 数据
   // 上传中的文件对象不是可渲染的 URL，跳过并交给下面的资料刷新补齐；
   // 移除背景图时为 null，需要保留以便背景层立即消失
-  const { avatar, backgroundImg, removeBackgroundImg, ...rest } = updatedProfile || {}
+  const { avatar, backgroundImg, removeBackgroundImg, session: _session, ...rest } = updatedProfile || {}
   const localPatch = { ...rest }
   if (typeof avatar === 'string') localPatch.avatar = avatar
   if (typeof backgroundImg === 'string' || backgroundImg === null) localPatch.backgroundImg = backgroundImg
@@ -622,11 +640,12 @@ const handleProfileUpdated = (updatedProfile) => {
 
   // 可能需要重新获取用户资料以确保数据同步
   getUserProfile(route.params.userId).then(res => {
+    if (!userStore.isCurrentSession(session) || String(route.params.userId) !== String(targetUserId)) return
     if (res.success) {
       profile.value = res.data
       refreshFollowStatus(res.data?.userId)
     }
-  })
+  }).catch(() => {})
 }
 
 const handleFollow = () => {
@@ -651,38 +670,25 @@ const handleFollow = () => {
   })
 }
 
-// 监听路由参数变化，当用户ID变化时重新加载数据
-watch(() => route.params.userId, (newUserId, oldUserId) => {
-  if (newUserId === oldUserId) return
-
-  // 丢弃在途请求，并重置分页状态
+const loadProfile = async () => {
   loadSeq++
   cursor.value = null
   currPageNo.value = 1
   notes.value = []
   hasMore.value = true
   isLoading.value = false
-
-  // 重置 tab 为默认的“笔记”选项卡；若 tab 确实变化，由 activeTab watcher 触发加载
-  const tabChanged = activeTab.value !== 'notes'
-  if (tabChanged) {
-    activeTab.value = 'notes'
-  }
-
-  // 获取新用户的资料
-  getUserProfile(newUserId).then(res => {
-    if (res.success) {
-      profile.value = res.data
-      refreshFollowStatus(res.data?.userId)
-    }
-  }).catch(() => {
-  }).finally(() => {
-    // 加载新用户的笔记；tab 变化时由 activeTab watcher 加载，避免重复请求
-    if (!tabChanged) {
-      loadNotes(true)
-    }
-  })
-}, { immediate: true })
+  loading.value = false
+  loadingMore.value = false
+  followStatus.value = 0
+  activeTab.value = 'notes'
+  const requestedId = profileUserId(route.params.userId)
+  const session = userStore.captureSession()
+  const loaded = await profileLoader.load(requestedId)
+  if (!loaded || !userStore.isCurrentSession(session) || profileUserId(route.params.userId) !== requestedId) return
+  refreshFollowStatus(loaded.userId)
+  loadNotes(true)
+}
+watch([() => route.params.userId, () => userStore.generation], loadProfile, { immediate: true, flush: 'sync' })
 </script>
 
 <style scoped>
@@ -691,6 +697,8 @@ watch(() => route.params.userId, (newUserId, oldUserId) => {
   display: flex;
   flex-direction: column;
 }
+
+.profile-load-status { padding: 80px 24px; text-align: center; color: var(--color-ink-soft); }
 
 /* 背景图层：圆角卡片铺满内容宽度（与下方笔记瀑布流左右对齐），
    绝对定位在资料头部区域，不参与交互 */

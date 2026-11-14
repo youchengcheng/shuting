@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 public interface NoteCollectionDOMapper {
+    NoteCollectionDO selectRelationForUpdate(@Param("userId") Long userId, @Param("noteId") Long noteId);
     int deleteByPrimaryKey(Long id);
 
     int insert(NoteCollectionDO record);

@@ -280,16 +280,18 @@ const handleConfirmTerms = () => {
 }
 
 // 登录成功后的公共处理：存储 token、拉取用户资料、关闭弹窗
-const handleLoginSuccess = (token) => {
+const handleLoginSuccess = (token, previousSession) => {
+  if (!userStore.isCurrentSession(previousSession)) return
   // 存储 token
   userStore.setToken(token)
+  const session = userStore.captureSession()
 
   // 获取用户基本信息
   getUserProfile().then(res => {
     if (res.success) {
-      userStore.setProfile(res.data)
+      userStore.setProfile(res.data, session)
     }
-  })
+  }).catch(() => {})
 
   message.show('登录成功')
   onClose() // 关闭登录框
@@ -297,6 +299,7 @@ const handleLoginSuccess = (token) => {
 
 // 执行登录
 const doLogin = () => {
+  const session = userStore.captureSession()
   if (!isPhoneValid.value) {
     message.show('请输入正确的手机号')
     return
@@ -315,8 +318,8 @@ const doLogin = () => {
         return
       }
 
-      handleLoginSuccess(res.data)
-    })
+      handleLoginSuccess(res.data, session)
+    }).catch(() => {})
     return
   }
 
@@ -339,8 +342,8 @@ const doLogin = () => {
       return
     }
 
-    handleLoginSuccess(res.data)
-  })
+    handleLoginSuccess(res.data, session)
+  }).catch(() => {})
 }
 
 const onBeforeEnter = (el) => {

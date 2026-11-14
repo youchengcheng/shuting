@@ -1,5 +1,10 @@
 <template>
   <div class="comment-list" @scroll="handleScroll" ref="commentListRef">
+    <p v-if="loading" class="comment-list__status" role="status">正在加载评论…</p>
+    <p v-else-if="error" class="comment-list__status" role="alert">{{ error }} <button type="button" class="st-btn st-btn-ghost" @click="$emit('retry')">重试</button></p>
+    <p v-if="locating" class="comment-list__status" role="status">正在定位相关评论…</p>
+    <p v-else-if="locationError" class="comment-list__status" role="status">{{ locationError }} <button type="button" class="st-btn st-btn-ghost" @click="$emit('retry-target')">重试</button></p>
+    <p v-else-if="unavailableReason" class="comment-list__status" role="status">相关评论已删除或不可查看</p>
     <!-- 只在有评论时显示评论数量 -->
     <div v-if="comments && comments.length > 0" class="comment-list__count st-num">
       共 {{ total }} 条评论
@@ -7,21 +12,27 @@
 
     <!-- 评论列表 -->
     <div>
-      <CommentItem
-        v-for="comment in comments"
-        :key="comment.commentId"
-        :comment="comment"
-        :current-user-id="currentUserId"
-        @reply="$emit('reply', $event)"
-        @expand-replies="$emit('expand-replies', $event)"
-        @like="$emit('like', $event)"
-        @delete="$emit('delete', $event)"
-      />
+      <template v-for="section in sections" :key="section.pageNo">
+        <div v-if="section.firstMissingPage" class="comment-list__gap">
+          <button type="button" class="st-btn st-btn-ghost" :disabled="loadingMore" @click="$emit('load-page', section.firstMissingPage)">{{ loadingMore ? '正在加载…' : '查看更多评论' }}</button>
+        </div>
+        <CommentItem
+          v-for="comment in section.comments"
+          :key="comment.commentId"
+          :comment="comment"
+          :current-user-id="currentUserId"
+          :target-comment-id="targetCommentId"
+          @reply="$emit('reply', $event)"
+          @expand-replies="$emit('expand-replies', $event)"
+          @like="$emit('like', $event)"
+          @delete="$emit('delete', $event)"
+        />
+      </template>
     </div>
 
     <!-- 空评论状态 -->
     <EmptyState
-      v-if="comments === null || comments.length === 0"
+      v-if="!loading && !error && (!comments || comments.length === 0)"
       compact
       title="这是一片荒地"
       description="还没有人评论，来说说你的想法"
@@ -30,16 +41,28 @@
     </EmptyState>
 
     <!-- 到底了提示 -->
-    <div v-if="comments && comments.length > 0 && !hasMore" class="comment-list__end">到底了</div>
+    <div v-if="comments && comments.length > 0" class="comment-list__end">
+      <button v-if="hasMore" type="button" class="st-btn st-btn-ghost" :disabled="loadingMore" @click="$emit('load-more')">{{ loadingMore ? '正在加载…' : '加载更多评论' }}</button>
+      <span v-else>到底了</span>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref } from 'vue'
+import { commentPageSections } from '@/utils/commentContext'
 import CommentItem from './CommentItem.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 
 const props = defineProps({
+  paging: { type: Object, default: null },
+  targetCommentId: { type: String, default: '' },
+  loading: Boolean,
+  loadingMore: Boolean,
+  locating: Boolean,
+  locationError: { type: String, default: '' },
+  error: { type: String, default: '' },
+  unavailableReason: { type: String, default: '' },
   comments: {
     type: Array,
     default: () => []
@@ -63,12 +86,13 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['load-more', 'click-comment', 'reply', 'expand-replies', 'like', 'delete'])
+const emit = defineEmits(['load-more', 'load-page', 'click-comment', 'reply', 'expand-replies', 'like', 'delete', 'retry', 'retry-target'])
 const commentListRef = ref(null)
+const sections = computed(() => commentPageSections(props.paging, props.comments))
 
 // 处理滚动事件
 const handleScroll = (e) => {
-  if (!props.comments.length || !props.hasMore) return
+  if (!props.comments?.length || !props.hasMore || props.loadingMore) return
 
   const container = e.target
   const scrollTop = container.scrollTop
@@ -81,20 +105,6 @@ const handleScroll = (e) => {
   }
 }
 
-// 组件挂载时添加滚动监听
-onMounted(() => {
-  if (commentListRef.value) {
-    commentListRef.value.addEventListener('scroll', handleScroll)
-  }
-})
-
-// 组件卸载时移除滚动监听
-onBeforeUnmount(() => {
-  if (commentListRef.value) {
-    commentListRef.value.removeEventListener('scroll', handleScroll)
-  }
-})
-
 // 点击评论处理
 const onClickComment = () => {
   emit('click-comment')
@@ -106,6 +116,8 @@ const onClickComment = () => {
   /* 与笔记正文左右对齐：评论列表整块缩进 24px */
   padding: 16px 24px;
 }
+.comment-list__status { font-size: 14px; line-height: 1.6; color: var(--color-ink-soft); }
+.comment-list__gap { display: flex; justify-content: center; margin: 12px 0; }
 
 .comment-list__count {
   margin-bottom: 12px;

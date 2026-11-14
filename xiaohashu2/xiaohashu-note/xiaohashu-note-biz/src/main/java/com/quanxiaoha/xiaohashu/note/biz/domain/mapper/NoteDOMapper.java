@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 public interface NoteDOMapper {
+    List<NoteDO> selectByIds(@Param("ids") List<Long> ids);
     int deleteByPrimaryKey(Long id);
 
     int insert(NoteDO record);

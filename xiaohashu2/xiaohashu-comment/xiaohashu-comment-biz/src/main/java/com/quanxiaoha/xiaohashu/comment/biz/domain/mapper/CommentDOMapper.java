@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 public interface CommentDOMapper {
+    int insertNew(CommentBO comment);
     int deleteByPrimaryKey(Long id);
 
     int insert(CommentDO record);
@@ -53,6 +54,12 @@ public interface CommentDOMapper {
     List<CommentDO> selectPageList(@Param("noteId") Long noteId,
                                    @Param("offset") long offset,
                                    @Param("pageSize") long pageSize);
+
+    Long selectRootCommentPosition(@Param("noteId") Long noteId,
+                                   @Param("commentId") Long commentId);
+
+    Long selectChildCommentPosition(@Param("parentId") Long parentId,
+                                    @Param("commentId") Long commentId);
 
     /**
      * 批量查询二级评论

@@ -1,5 +1,7 @@
 <template>
   <div class="note-detail">
+    <EmptyState v-if="noteError" class="note-detail__error" title="笔记暂时无法查看" :description="noteError"><button type="button" class="st-btn st-btn-ghost" @click="initializeDetail">重试</button></EmptyState>
+    <template v-else>
     <!-- 左侧媒体区域（data-note-media：展开动画的落点，见 composables/noteMorph.js） -->
     <div class="note-detail__media" data-note-media>
       <div class="note-detail__media-inner">
@@ -73,16 +75,27 @@
               <!-- 评论区 -->
               <CommentList
                 :comments="comments"
+                :paging="rootCommentPaging"
+                :target-comment-id="targetCommentId"
+                :loading="commentLoading"
+                :loading-more="isLoadingMoreComments"
+                :locating="isLocatingComment"
+                :location-error="commentLocationError"
+                :error="commentError"
+                :unavailable-reason="contextUnavailableReason"
                 :total="commentTotal"
                 :has-more="hasMoreComments"
                 :more-count="moreCommentsCount"
                 :current-user-id="currentUserId"
                 @load-more="loadMoreComments"
+                @load-page="loadMoreComments"
                 @reply="onReplyClick"
                 @click-comment="focusComment"
                 @expand-replies="handleExpandReplies"
                 @like="handleCommentLike"
                 @delete="onCommentDelete"
+                @retry="reloadComments"
+                @retry-target="locateTargetComment"
               />
             </div>
             
@@ -297,6 +310,7 @@
             </div>
           </div>
 
+    </template>
     <!-- 删除评论二次确认 -->
     <ConfirmDialog
       v-model:visible="showDeleteCommentDialog"
@@ -314,10 +328,12 @@
 import { ref, computed, nextTick, watch, onBeforeUnmount, inject, onMounted } from 'vue'
 import gsap from 'gsap'
 import CommentList from './CommentList.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
+import { captureCommentSubmission, createCommentPageState, normalizeComment, mergeCommentPage, flattenCommentPages, nextMissingCommentPage, createCommentTargetNavigator, createCommentScrollAnchor, scrollCommentIntoContainer } from '@/utils/commentContext'
 import ImageCarousel from '@/components/common/ImageCarousel.vue'
 import VideoPlayer from '@/components/common/VideoPlayer.vue'
 import { getNoteDetail, likeNote, unlikeNote, collectNote, uncollectNote, isLikedAndCollectedData } from '@/api/note' // 获取笔记详情的API
-import { getCommentList, publishComment, getChildCommentList, likeComment, unlikeComment, deleteComment } from '@/api/comment'
+import { getCommentList, getCommentContext, publishComment, getChildCommentList, likeComment, unlikeComment, deleteComment } from '@/api/comment'
 import { fetchIdempotentToken } from '@/api/idempotent'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { followUser, unfollowUser, isFollowedUser } from '@/api/relation'
@@ -332,6 +348,7 @@ const userStore = useUserStore()
 const noteStore = useNoteStore()
 
 const props = defineProps({
+  targetCommentId: { type: String, default: '' },
   noteId: {
     type: [String, Number],
     default: ''
@@ -345,6 +362,18 @@ const props = defineProps({
 const currNote = ref({})
 const currNoteId = ref('')
 const followStatus = ref(0)
+const noteError = ref('')
+let detailGeneration = 0
+let commentGeneration = 0
+let publishOperation = null
+const contextUnavailableReason = ref('')
+const commentLoading = ref(false)
+const commentError = ref('')
+const isLocatingComment = ref(false)
+const commentLocationError = ref('')
+const captureOwner = () => ({ session: userStore.captureSession(), generation: detailGeneration, commentGeneration, noteId: String(currNoteId.value), mode: 'ALL' })
+const ownsDetail = (owner) => userStore.isCurrentSession(owner.session) && owner.generation === detailGeneration && owner.noteId === String(currNoteId.value)
+const ownsComments = (owner) => ownsDetail(owner) && owner.commentGeneration === commentGeneration
 
 // 打开详情时卡片上已经加载好的封面：数据到位前先顶上媒体区
 const optimisticCover = computed(() => {
@@ -373,6 +402,20 @@ const modalRef = ref(null)
 const authorInfoRef = ref(null)
 const contentRef = ref(null)
 const scrollContainerRef = ref(null)
+const overlayScrollContainer = inject('noteOverlayScrollContainer', ref(null))
+const actualScrollContainer = () => window.matchMedia('(max-width: 1023px)').matches ? overlayScrollContainer.value || scrollContainerRef.value : scrollContainerRef.value
+const commentScrollAnchor = createCommentScrollAnchor()
+const scrollToComment = async (commentId, stabilize = false, isCurrent = () => true) => {
+  const owner = captureOwner()
+  await nextTick()
+  if (!ownsComments(owner) || !isCurrent()) return
+  const container = actualScrollContainer()
+  const target = [...(container?.querySelectorAll('[data-comment-id]') || [])].find(element => element.dataset.commentId === String(commentId))
+  if (!target || !container) return
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (stabilize) commentScrollAnchor.start(container, target, { reducedMotion, isCurrent: () => ownsComments(owner) && isCurrent() })
+  else { commentScrollAnchor.stop(); scrollCommentIntoContainer(container, target, reducedMotion ? 'auto' : 'smooth') }
+}
 
 const isScrolled = ref(false)
 
@@ -391,50 +434,72 @@ const handleScroll = (e) => {
   }
 }
 
-const currCommentPageNo = ref(1)
-const totalCommentPage = ref(0)
 const comments = ref([])
+const rootCommentPaging = ref(createCommentPageState())
+const rootPageFlights = new Map()
+const childPageFlights = new Map()
+const commentRequestControllers = new Set()
 
 
 const commentTotal = ref(0)
-const hasMoreComments = computed(() => currCommentPageNo.value < totalCommentPage.value)
+const hasMoreComments = computed(() => nextMissingCommentPage(rootCommentPaging.value) !== null)
 const moreCommentsCount = ref(7)
 
 // 后端一级评论返回 firstReplyComment（最早的一条回复），这里转成前端 childComments 数组展示
-const mapCommentItem = (comment) => {
-  if (!comment || !comment.firstReplyComment) return comment
-  return {
-    ...comment,
-    childComments: [comment.firstReplyComment]
+const mapCommentItem = (comment, previous) => {
+  const normalized = normalizeComment(comment)
+  const firstReplyComment = comment.firstReplyComment ? normalizeComment(comment.firstReplyComment) : null
+  const childPaging = previous?.childPaging || createCommentPageState()
+  if (!previous?.childPaging) {
+    if (firstReplyComment) childPaging.pages[0] = [firstReplyComment]
   }
+  childPaging.totalCount = Number(comment.childCommentTotal || 0)
+  childPaging.totalPages = Math.max(childPaging.totalPages, Math.ceil(childPaging.totalCount / 6))
+  return { ...normalized, firstReplyComment, childPaging, childComments: flattenCommentPages(childPaging, deletedCommentIds) }
+}
+
+const commentRequest = (owner, request) => {
+  const controller = request?.options?.signal ? null : new AbortController()
+  if (controller) commentRequestControllers.add(controller)
+  return { controller, options: { ...request?.options, signal: request?.options?.signal || controller.signal, session: owner.session } }
+}
+const requestOwnsComments = (owner, request) => ownsComments(owner) && (!request?.isCurrent || request.isCurrent())
+const loadRootCommentPage = (pageNo, request, force = false) => {
+  if (!force && Object.hasOwn(rootCommentPaging.value.pages, pageNo)) return Promise.resolve()
+  if (rootPageFlights.has(pageNo)) return rootPageFlights.get(pageNo)
+  const owner = captureOwner()
+  if (!requestOwnsComments(owner, request)) return Promise.resolve()
+  const ctx = commentRequest(owner, request)
+  const flight = (async () => {
+    const response = await getCommentList(owner.noteId, pageNo, ctx.options)
+    if (!requestOwnsComments(owner, request)) return
+    mergeCommentPage(rootCommentPaging.value, response, mapCommentItem)
+    comments.value = flattenCommentPages(rootCommentPaging.value, deletedCommentIds)
+    commentTotal.value = rootCommentPaging.value.totalCount
+  })().finally(() => {
+    if (ctx.controller) commentRequestControllers.delete(ctx.controller)
+    if (rootPageFlights.get(pageNo) === flight) rootPageFlights.delete(pageNo)
+  })
+  rootPageFlights.set(pageNo, flight)
+  return flight
 }
 
 // 加载更多评论
 const isLoadingMoreComments = ref(false)
 
-const loadMoreComments = () => {
-  if (currCommentPageNo.value >= totalCommentPage.value || isLoadingMoreComments.value) return
-  
+const loadMoreComments = async (requestedPage) => {
+  const nextPage = Number.isInteger(requestedPage) ? requestedPage : nextMissingCommentPage(rootCommentPaging.value)
+  if (nextPage === null || commentLoading.value || isLoadingMoreComments.value) return
+  const owner = captureOwner()
   isLoadingMoreComments.value = true
-  const nextPage = currCommentPageNo.value + 1
-  
-  getCommentList(currNoteId.value, nextPage).then(res => {
-    if (res.success) {
-      // 过滤掉可能重复的评论
-      const existingCommentIds = new Set(comments.value.map(c => c.commentId))
-      const newComments = (res.data || [])
-        .map(mapCommentItem)
-        .filter(c => !existingCommentIds.has(c.commentId))
-      
-      // 将新评论追加到现有列表
-      comments.value = [...comments.value, ...newComments]
-      currCommentPageNo.value = res.pageNo
-      commentTotal.value = res.totalCount
-      totalCommentPage.value = res.totalPage
-    }
-  }).finally(() => {
-    isLoadingMoreComments.value = false
-  })
+  try {
+    await loadRootCommentPage(nextPage)
+    if (ownsComments(owner)) commentError.value = ''
+  } catch {
+    if (ownsComments(owner)) commentError.value = '更多评论加载失败，请重试'
+  } finally {
+    if (ownsComments(owner)) isLoadingMoreComments.value = false
+  }
 }
 
 // 登录状态控制
@@ -516,69 +581,6 @@ const onCancel = () => {
   }
 }
 
-// 监听笔记 ID 变化（由路由参数驱动）
-watch(() => props.noteId, (newNoteId) => {
-  if (newNoteId) {
-    // 进入详情时加载数据
-    currNoteId.value = newNoteId
-    currNote.value = { ...props.note }
-    
-    // 加载笔记详情
-    getNoteDetail(props.noteId).then(res => {
-      if (res.success) {
-        // 详情接口不返回点赞/收藏/评论数，从卡片数据兜底初始化
-        currNote.value = {
-          ...res.data,
-          likeTotal: Number(res.data.likeTotal ?? props.note?.likeTotal ?? 0),
-          collectTotal: Number(res.data.collectTotal ?? props.note?.collectTotal ?? 0),
-          commentTotal: Number(res.data.commentTotal ?? props.note?.commentTotal ?? 0)
-        }
-        followStatus.value = Number(res.data?.followStatus) || 0
-      }
-    })
-    
-    // 加载评论列表第一页
-    getCommentList(props.noteId, 1).then(res => {
-      if (res.success) {
-        comments.value = (res.data || []).map(mapCommentItem)
-      commentTotal.value = res.totalCount
-      if (currNote.value && currNote.value.id) {
-        currNote.value.commentTotal = res.totalCount
-      }
-      currCommentPageNo.value = res.pageNo
-        totalCommentPage.value = res.totalPage
-      }
-    })
-
-    isLikedAndCollectedData(props.noteId).then(res => {
-      if (res.success) {
-        isNoteLiked.value = res.data.isLiked
-        isNoteCollected.value = res.data.isCollected
-      }
-    })
-  } else {
-    // 模态框关闭时重置数据
-    currNote.value = {}
-    currNoteId.value = ''
-    comments.value = []
-    commentTotal.value = 0
-    currCommentPageNo.value = 1
-    totalCommentPage.value = 1
-    hasMoreComments.value = false
-    commentContent.value = ''
-    commentImage.value = ''
-    replyTo.value = null
-    isInputFocused.value = false
-    isScrolled.value = false
-    isNoteLiked.value = false
-    isNoteCollected.value = false
-    followStatus.value = 0
-    // 关闭删除评论确认框，避免下次打开残留
-    showDeleteCommentDialog.value = false
-    pendingDeleteComment.value = null
-  }
-}, { immediate: true })
-
 // 表情选择相关
 const showEmojiPicker = ref(false)
 const emojiButtonRef = ref(null)
@@ -625,11 +627,16 @@ const handleClickOutside = (event) => {
 // 组件挂载时添加点击外部关闭事件
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  nextTick(() => overlayScrollContainer.value?.addEventListener('scroll', handleScroll))
 })
 
 // 组件卸载时移除事件监听
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
+  overlayScrollContainer.value?.removeEventListener('scroll', handleScroll)
+  detailGeneration += 1
+  commentGeneration += 1
+  cancelCommentLoading()
 })
 
 
@@ -641,6 +648,7 @@ const triggerFileUpload = () => {
 
 // 处理文件选择
 const handleFileChange = (event) => {
+  const owner = captureOwner()
   const file = event.target.files[0]
   if (!file) return
   
@@ -663,12 +671,14 @@ const handleFileChange = (event) => {
   message.show('图片上传中...')
   
   uploadFile(formData).then(res => {
+    if (!ownsComments(owner)) return
     if (res.success) {
       commentImage.value = res.data
     } else {
       message.show('图片上传失败')
     }
   }).catch(err => {
+    if (!ownsComments(owner)) return
     console.error('图片上传错误:', err)
     message.show('图片上传失败')
   })
@@ -700,175 +710,138 @@ const findParentComment = (commentId, commentsList) => {
   return null
 }
 
-// 修改发布评论函数
+// Snapshot all mutable fields before the first await; results belong to this note and mode.
 const handlePublishComment = async () => {
-  // 发布中，忽略重复点击
   if (isPublishingComment.value) return
-
-  
-  // 检查是否有内容或图片
+  if (!isLoggedIn.value) { showLoginModal.value = true; return }
   if (!commentContent.value.trim() && !commentImage.value) {
     message.show('请输入评论内容或上传图片')
     return
   }
-  
-  // 标记发布中，避免连点重复提交
+  const owner = captureOwner()
+  const submission = captureCommentSubmission({ noteId: currNoteId.value, content: commentContent.value, imageUrl: commentImage.value, reply: replyTo.value, profile: userStore.profile, session: owner.session, generation: owner.generation, mode: owner.mode })
+  const operation = Symbol('comment-publish')
+  publishOperation = operation
   isPublishingComment.value = true
-
-  // 发布评论前先申请幂等 Token，防止重复评论（申请失败自动降级为无 Token，后端灰度放行）
-  const idempotentToken = await fetchIdempotentToken()
-
-  publishComment({
-    noteId: currNoteId.value,
-    content: commentContent.value,
-    replyCommentId: replyTo.value?.commentId,
-    imageUrl: commentImage.value
-  }, idempotentToken).then(res => {
-    if (res.success) {
-      message.show('评论成功')
-      
-      let commentId = res.data || null
-
-      // 构建新评论对象
-      const newComment = {
-        commentId: commentId,
-        content: commentContent.value,
-        createTime: '刚刚',
-        nickname: userStore.profile.nickname,
-        avatar: userStore.profile.avatar,
-        likeTotal: 0,
-        imageUrl: commentImage.value,
-        replyUserName: replyTo.value?.nickname || '',
-        isNewComment: true  // 添加新评论标识
-      }
-      
-      // 判断是否为回复评论
-      if (replyTo.value && replyTo.value.commentId) {
-        // 查找被回复评论的父评论
-        const result = findParentComment(replyTo.value.commentId, comments.value)
-        if (result) {
-          if (result.isChild) {
-            // 如果回复的是二级评论，将新评论插入到同级的后面
-            result.parentComment.childComments.splice(result.childIndex + 1, 0, newComment)
-            result.parentComment.childCommentTotal = Number(result.parentComment.childCommentTotal || 0) + 1
-          } else {
-            // 如果回复的是一级评论，添加到其子评论列表
-            if (!result.parentComment.childComments) {
-              result.parentComment.childComments = []
-            }
-            // 确保 childCommentTotal 正确更新
-            if (!result.parentComment.childCommentTotal) {
-              result.parentComment.childCommentTotal = 0
-            }
-            result.parentComment.childCommentTotal += 1
-            
-            // 如果还没有加载过子评论或只有默认的一条，直接添加到数组中
-            if (!result.parentComment.childComments.length) {
-              result.parentComment.childComments = [newComment]
-            } else {
-              // 如果已经加载了子评论，添加到开头
-              result.parentComment.childComments.unshift(newComment)
-            }
-          }
-        }
-      } else {
-        // 是一级评论，添加到评论列表最前面
-        if (comments.value && comments.value.length > 0) {
-          comments.value = [newComment, ...comments.value]
-        } else {
-          comments.value = [newComment]
-        }
-      }
-      
-      // 更新评论总数
-      commentTotal.value += 1
-      
-      // 重置输入框和状态
-      isInputFocused.value = false
-      commentContent.value = ''
-      commentImage.value = '' // 清除已上传的图片
-      if (commentInput.value) {
-        commentInput.value.blur()
-      }
-      
-      // 如果是回复评论，滚动到父评论位置
-      // 如果是一级评论，滚动到评论区顶部
-      nextTick(() => {
-        if (scrollContainerRef.value) {
-          // 只有发布一级评论（直接评论笔记）时才滚动到评论区顶部
-          if (!replyTo.value) {
-            const contentHeight = contentRef.value ? contentRef.value.offsetHeight : 0
-            scrollContainerRef.value.scrollTop = contentHeight
-          } else {
-            // 二级评论发布成功后不需要滚动，保持当前位置即可
-          }
-          replyTo.value = null  // 清除回复对象
-        }
-      })
-    } else {
-      message.show(res.message || '评论失败，请稍后重试')
+  try {
+    const idempotentToken = await fetchIdempotentToken()
+    if (!ownsComments(owner)) return
+    const res = await publishComment({ noteId: submission.noteId, content: submission.content, imageUrl: submission.imageUrl, replyCommentId: submission.reply?.commentId }, idempotentToken)
+    if (!ownsComments(owner)) return
+    if (!res.success) { message.show(res.message || '评论失败，请稍后重试'); return }
+    const newComment = {
+      commentId: String(res.data), noteId: submission.noteId, userId: submission.profile.userId,
+      content: submission.content, imageUrl: submission.imageUrl, createTime: '刚刚',
+      nickname: submission.profile.nickname, avatar: submission.profile.avatar, likeTotal: 0,
+      liked: false, childCommentTotal: 0, replyUserName: submission.reply?.nickname || '', isNewComment: true
     }
-  }).catch(error => {
-    console.error('发布评论失败:', error)
-    message.show('评论失败，请稍后重试')
-  }).finally(() => {
-    isPublishingComment.value = false
-  })
+    const destination = comments.value
+    if (submission.reply?.commentId) {
+      const result = findParentComment(submission.reply.commentId, destination)
+      if (result) {
+        const parent = result.parentComment
+        parent.childComments = parent.childComments || []
+        parent.childComments.splice(result.isChild ? result.childIndex + 1 : 0, 0, newComment)
+        parent.childPaging = parent.childPaging || createCommentPageState()
+        const replyPage = result.isChild ? Object.keys(parent.childPaging.pages).find(pageNo => parent.childPaging.pages[pageNo].some(child => String(child.commentId) === String(submission.reply.commentId))) : '0'
+        const pageItems = parent.childPaging.pages[replyPage || '0'] ||= []
+        const replyIndex = pageItems.findIndex(child => String(child.commentId) === String(submission.reply.commentId))
+        pageItems.splice(result.isChild && replyIndex >= 0 ? replyIndex + 1 : 0, 0, newComment)
+        parent.childCommentTotal = Number(parent.childCommentTotal || 0) + 1
+      }
+    } else {
+      const localComments = rootCommentPaging.value.pages[0] ||= []
+      localComments.unshift(newComment)
+      comments.value = [newComment, ...comments.value]
+    }
+    commentTotal.value = Number(commentTotal.value || 0) + 1
+    currNote.value.commentTotal = Number(currNote.value.commentTotal || 0) + 1
+    // Preserve a draft typed while the request was in flight.
+    if (commentContent.value === submission.content && commentImage.value === submission.imageUrl && replyTo.value?.commentId === submission.reply?.commentId) {
+      commentContent.value = ''
+      commentImage.value = ''
+      replyTo.value = null
+      isInputFocused.value = false
+      commentInput.value?.blur()
+    }
+    message.show('评论成功')
+    void scrollToComment(newComment.commentId)
+  } catch {
+    if (ownsComments(owner)) message.show('评论失败，请稍后重试')
+  } finally {
+    if (publishOperation === operation) {
+      isPublishingComment.value = false
+      publishOperation = null
+    }
+  }
 }
 
 // 加载二级评论
-const loadChildComments = (parentComment, pageNo = 1) => {
-  if (!parentComment || !parentComment.commentId) return
-
-  if (parentComment.isLoadingChildComments) return
-  
-  // 确保父评论有 childComments 数组和分页信息
-  if (!parentComment.childComments) {
-    parentComment.childComments = []
-  }
-  if (!parentComment.currChildCommentPage) {
-    parentComment.currChildCommentPage = 0
-  }
-  
-  const nextPage = pageNo > 1 ? pageNo : parentComment.currChildCommentPage + 1
-  if (parentComment.totalChildCommentPage && nextPage > parentComment.totalChildCommentPage) return
+const loadChildComments = (parentComment, requestedPage, request) => {
+  const owner = captureOwner()
+  if (!parentComment?.commentId || !requestOwnsComments(owner, request)) return Promise.resolve()
+  parentComment.childPaging = parentComment.childPaging || createCommentPageState()
+  const nextPage = Number.isInteger(requestedPage) ? requestedPage : nextMissingCommentPage(parentComment.childPaging)
+  if (nextPage === null || Object.hasOwn(parentComment.childPaging.pages, nextPage)) return Promise.resolve()
+  const key = `${parentComment.commentId}:${nextPage}`
+  if (childPageFlights.has(key)) return childPageFlights.get(key)
+  const ctx = commentRequest(owner, request)
   parentComment.isLoadingChildComments = true
-
-  getChildCommentList(parentComment.commentId, nextPage).then(res => {
-    if (res.success) {
-      // 首条回复已通过 firstReplyComment 预置展示，分页返回时需过滤避免重复
-      const firstReplyCommentId = parentComment.firstReplyComment?.commentId
-      const existingIds = new Set(parentComment.childComments.map(child => child.commentId))
-      const childData = (res.data || []).filter(child =>
-        child.commentId !== firstReplyCommentId && !existingIds.has(child.commentId)
-      )
-      if (childData.length > 0) {
-        // 有数据时，将新的子评论追加到现有列表末尾
-        parentComment.childComments.push(...childData)
-      }
-
-      // 即使本页只有已展示的首条回复，也要推进分页状态，避免错误地标记为无更多数据
-      parentComment.childCommentTotal = res.totalCount
-      parentComment.currChildCommentPage = res.pageNo
-      parentComment.totalChildCommentPage = res.totalPage
-      parentComment.hasMoreChildComments = res.pageNo < res.totalPage
-    }
-  }).catch(error => {
-    console.error('加载二级评论失败:', error)
-  }).finally(() => {
-    parentComment.isLoadingChildComments = false
+  parentComment.childCommentError = ''
+  const flight = (async () => {
+    const response = await getChildCommentList(parentComment.commentId, nextPage, ctx.options)
+    if (!requestOwnsComments(owner, request)) return
+    mergeCommentPage(parentComment.childPaging, response)
+    parentComment.childComments = flattenCommentPages(parentComment.childPaging, deletedCommentIds)
+    parentComment.childCommentTotal = parentComment.childPaging.totalCount
+    parentComment.hasMoreChildComments = nextMissingCommentPage(parentComment.childPaging) !== null
+  })().finally(() => {
+    if (ctx.controller) commentRequestControllers.delete(ctx.controller)
+    if (childPageFlights.get(key) === flight) childPageFlights.delete(key)
+    if (ownsComments(owner)) parentComment.isLoadingChildComments = [...childPageFlights.keys()].some(pageKey => pageKey.startsWith(`${parentComment.commentId}:`))
   })
+  childPageFlights.set(key, flight)
+  return flight
 }
 
 // 处理展开回复事件
-const handleExpandReplies = (comment) => {
-  loadChildComments(comment)
+const handleExpandReplies = async (event) => {
+  const comment = event.comment || event
+  const owner = captureOwner()
+  try { await loadChildComments(comment, event.pageNo) }
+  catch { if (ownsComments(owner)) comment.childCommentError = '回复加载失败，请重试' }
+}
+
+const targetNavigator = createCommentTargetNavigator({
+  api: { getCommentContext }, sessionOwner: userStore,
+  getRoots: () => comments.value, getRootPaging: () => rootCommentPaging.value,
+  loadRootPage: loadRootCommentPage, loadChildPage: loadChildComments,
+  onState: ({ loading, error, unavailableReason }) => {
+    isLocatingComment.value = loading
+    commentLocationError.value = error
+    contextUnavailableReason.value = unavailableReason
+  },
+  onFound: (commentId, current) => scrollToComment(commentId, true, current)
+})
+const locateTargetComment = () => {
+  const owner = captureOwner()
+  return targetNavigator.locate(owner.noteId, props.targetCommentId, () => ownsComments(owner))
+}
+const cancelCommentLoading = () => {
+  targetNavigator.cancel()
+  commentScrollAnchor.stop()
+  commentRequestControllers.forEach(controller => controller.abort())
+  commentRequestControllers.clear()
+  rootPageFlights.clear()
+  childPageFlights.clear()
+  isLocatingComment.value = false
 }
 
 // 添加点赞状态
 const isNoteLiked = ref(false)
 // 处理笔记点赞、取消点赞
 const handleNoteLike = () => {
+  const owner = captureOwner()
   if (!isLoggedIn.value) {
     showLoginModal.value = true
     return
@@ -876,22 +849,24 @@ const handleNoteLike = () => {
 
   if (!isNoteLiked.value) {
     likeNote(currNoteId.value).then(res => {
+    if (!ownsDetail(owner)) return
     if (res.success) {
       isNoteLiked.value = !isNoteLiked.value
       currNote.value.likeTotal++
       } else {
         message.show(res.message)
       }
-    })
+    }).catch(() => {})
     return
   }
   
   unlikeNote(currNoteId.value).then(res => {
+    if (!ownsDetail(owner)) return
     if (res.success) {
       isNoteLiked.value = !isNoteLiked.value
       currNote.value.likeTotal--
     }
-  })
+  }).catch(() => {})
 }
 
 
@@ -961,22 +936,12 @@ const removeCommentFromList = (targetComment) => {
 // 静默重拉第一页：用服务端数据校准列表与总数
 // 后端级联删除与计数扣减是异步的，这里只降不升，避免计数被旧值顶回去
 const refreshCommentList = () => {
+  const owner = captureOwner()
   if (!currNoteId.value) return
-  getCommentList(currNoteId.value, 1).then((res) => {
-    if (!res.success) return
-    comments.value = (res.data || [])
-      .map(mapCommentItem)
-      .filter((item) => !deletedCommentIds.has(item?.commentId))
-      .map((item) => {
-        if (!item?.childComments?.length) return item
-        const children = item.childComments.filter((child) => !deletedCommentIds.has(child?.commentId))
-        return { ...item, childComments: children }
-      })
-    currCommentPageNo.value = res.pageNo
-    totalCommentPage.value = res.totalPage
-
-    const serverTotal = Number(res.totalCount ?? 0)
-    const localTotal = Number(commentTotal.value || 0)
+  const localTotal = Number(commentTotal.value || 0)
+  loadRootCommentPage(1, undefined, true).then(() => {
+    if (!ownsComments(owner)) return
+    const serverTotal = rootCommentPaging.value.totalCount
     const nextTotal = Math.min(serverTotal, localTotal)
     commentTotal.value = nextTotal
     if (currNote.value) {
@@ -988,49 +953,66 @@ const refreshCommentList = () => {
 }
 
 const confirmDeleteComment = () => {
+  const owner = captureOwner()
   const comment = pendingDeleteComment.value
   if (!comment?.commentId || deleteCommentLoading.value) return
 
   deleteCommentLoading.value = true
   deleteComment(comment.commentId).then((res) => {
+    if (!ownsComments(owner)) return
     if (!res.success) {
       message.show(res.message || '删除失败')
       return
     }
 
     deletedCommentIds.add(comment.commentId)
+    if (String(comment.commentId) === props.targetCommentId || comment.childComments?.some(child => String(child.commentId) === props.targetCommentId)) {
+      targetNavigator.cancel()
+      commentScrollAnchor.stop()
+      isLocatingComment.value = false
+      contextUnavailableReason.value = 'COMMENT_UNAVAILABLE'
+    }
     removeCommentFromList(comment)
     showDeleteCommentDialog.value = false
     pendingDeleteComment.value = null
+    deleteCommentLoading.value = false
     refreshCommentList()
   }).catch(() => {
-    message.show('删除失败')
+    if (ownsComments(owner)) message.show('删除失败')
   }).finally(() => {
-    deleteCommentLoading.value = false
+    if (ownsComments(owner)) deleteCommentLoading.value = false
   })
 }
 
 // 添加评论点赞处理函数
 const handleCommentLike = ({ comment, liked }) => {
+  if (!isLoggedIn.value) { showLoginModal.value = true; return }
+  if (comment.likeLoading) return
+  const owner = captureOwner()
+  comment.likeLoading = true
 
 
   if (liked) {
     likeComment(comment.commentId).then(res => {
+    if (!ownsComments(owner)) return
     if (res.success) {
       // 直接更新传入的 comment 对象的点赞数
       comment.likeTotal++
+      comment.liked = true
       } else {
         message.show(res.message)
       }
-    })
+    }).catch(() => {}).finally(() => { if (ownsComments(owner)) comment.likeLoading = false })
     return
   }
   
   unlikeComment(comment.commentId).then(res => {
+    if (!ownsComments(owner)) return
     if (res.success) {
-      comment.likeTotal--
+      comment.likeTotal = Math.max(0, Number(comment.likeTotal || 0) - 1)
+      comment.liked = false
     }
-  })
+  }).catch(() => {}).finally(() => { if (ownsComments(owner)) comment.likeLoading = false })
 }
 
 // 添加收藏状态
@@ -1038,28 +1020,31 @@ const isNoteCollected = ref(false)
 
 // 处理笔记收藏
 const handleNoteCollect = () => {
+  const owner = captureOwner()
   if (!isLoggedIn.value) {
     showLoginModal.value = true
     return
   }
   if (!isNoteCollected.value) {
     collectNote(currNoteId.value).then(res => {
+      if (!ownsDetail(owner)) return
       if (res.success) {
         isNoteCollected.value = !isNoteCollected.value
         currNote.value.collectTotal++
       } else {
         message.show(res.message)
       }
-    })
+    }).catch(() => {})
     return
   }
 
   uncollectNote(currNoteId.value).then(res => {
+    if (!ownsDetail(owner)) return
     if (res.success) {
       isNoteCollected.value = !isNoteCollected.value
       currNote.value.collectTotal--
     }
-  })
+  }).catch(() => {})
 }
 
 // 分享：暂未接入分享能力，先给出占位提示
@@ -1068,6 +1053,8 @@ const handleShare = () => {
 }
 
 const handleFollow = () => {
+  const owner = captureOwner()
+  const creatorId = currNote.value.creatorId
   if (!userStore.token) {
     showLoginModal.value = true
     return
@@ -1077,20 +1064,98 @@ const handleFollow = () => {
     ? unfollowUser(currNote.value.creatorId)
     : followUser(currNote.value.creatorId)
   request.then(res => {
+    if (!ownsDetail(owner)) return
     if (!res.success) {
       message.show(res.message)
       return
     }
     // 重新查询关注关系状态（关注后是否互关取决于对方，前端无法预判）
-    isFollowedUser(currNote.value.creatorId).then(r => {
-      if (r.success) followStatus.value = Number(r.data) || 0
-    })
+    isFollowedUser(creatorId).then(r => {
+      if (ownsDetail(owner) && r.success) followStatus.value = Number(r.data) || 0
+    }).catch(() => {})
     message.show(wasFollowing ? '取消关注成功' : '关注成功')
-  })
+  }).catch(() => {})
 }
+
+const reloadComments = async () => {
+  commentGeneration += 1
+  cancelCommentLoading()
+  const owner = captureOwner()
+  rootCommentPaging.value = createCommentPageState()
+  comments.value = []
+  commentLoading.value = true
+  commentError.value = ''
+  commentLocationError.value = ''
+  contextUnavailableReason.value = ''
+  isLoadingMoreComments.value = false
+  try {
+    await loadRootCommentPage(1)
+    if (!ownsComments(owner)) return
+    currNote.value.commentTotal = commentTotal.value
+  } catch (error) {
+    if (ownsComments(owner)) commentError.value = error.message || '评论暂时无法加载，请重试'
+  } finally {
+    if (ownsComments(owner)) commentLoading.value = false
+  }
+  if (ownsComments(owner) && !commentError.value && props.targetCommentId) void locateTargetComment()
+}
+
+const initializeDetail = () => {
+  detailGeneration += 1
+  commentGeneration += 1
+  cancelCommentLoading()
+  publishOperation = null
+  isPublishingComment.value = false
+  deleteCommentLoading.value = false
+  deletedCommentIds.clear()
+  onCancel()
+  currNoteId.value = props.noteId || ''
+  currNote.value = { ...props.note }
+  comments.value = []
+  rootCommentPaging.value = createCommentPageState()
+  commentTotal.value = 0
+  isLoadingMoreComments.value = false
+  commentLoading.value = !!props.noteId
+  commentError.value = ''
+  commentLocationError.value = ''
+  contextUnavailableReason.value = ''
+  noteError.value = ''
+  followStatus.value = 0
+  isNoteLiked.value = false
+  isNoteCollected.value = false
+  showDeleteCommentDialog.value = false
+  pendingDeleteComment.value = null
+  if (!props.noteId) return
+  const owner = captureOwner()
+  getNoteDetail(owner.noteId).then(response => {
+    if (!ownsDetail(owner)) return
+    if (!response.success) { noteError.value = response.message || '内容已被删除或不可查看'; return }
+    currNote.value = {
+      ...response.data,
+      likeTotal: Number(response.data.likeTotal ?? props.note?.likeTotal ?? 0),
+      collectTotal: Number(response.data.collectTotal ?? props.note?.collectTotal ?? 0),
+      commentTotal: Number(response.data.commentTotal ?? props.note?.commentTotal ?? 0)
+    }
+    followStatus.value = Number(response.data.followStatus || 0)
+    commentTotal.value = currNote.value.commentTotal
+    void reloadComments()
+  }).catch(() => {
+    if (ownsDetail(owner)) noteError.value = '笔记加载失败，请稍后重试'
+  })
+  if (userStore.token) {
+    isLikedAndCollectedData(owner.noteId).then(response => {
+      if (!ownsDetail(owner) || !response.success) return
+      isNoteLiked.value = !!response.data.isLiked
+      isNoteCollected.value = !!response.data.isCollected
+    }).catch(() => {})
+  }
+}
+
+watch([() => props.noteId, () => props.targetCommentId, () => userStore.generation], initializeDetail, { immediate: true })
 </script>
 
 <style scoped>
+.note-detail__error { grid-column: 1 / -1; align-self: center; }
 .zoom-move {
   transition: transform 0.3s ease-out;
 }

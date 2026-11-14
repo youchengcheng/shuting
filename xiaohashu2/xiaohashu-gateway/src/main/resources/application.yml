@@ -46,6 +46,12 @@ spring:
             - Path=/comment/**
           filters:
             - StripPrefix=0
+        - id: notification
+          uri: lb://xiaohashu-notification
+          predicates:
+            - Path=/notification/**
+          filters:
+            - StripPrefix=0
         - id: search
           uri: lb://xiaohashu-search
           predicates:

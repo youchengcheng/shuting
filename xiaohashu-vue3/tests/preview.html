@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>通知界面验证 · 合成数据</title></head>
+<body><div id="app"></div><script type="module">
+// Local-only UI fixture: mount the production app and isolate every API/SSE request.
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import App from '../src/App.vue'
+import router from '../src/router/index.js'
+import axios from '../src/axios.js'
+import { useUserStore } from '../src/stores/user.js'
+import '../src/assets/main.css'
+const avatar = '/src/assets/avatar.png'
+const fixtureCase = new URLSearchParams(window.location.search).get('case')
+let revision = 1
+const categories = ['LIKE_COLLECTION', 'COMMENT_REPLY', 'FOLLOW']
+const names = ['林间小路', '月亮书店', '一页晚风', '沿着河走', '读书的阿秋']
+const types = { LIKE_COLLECTION: ['NOTE_LIKE', 'COMMENT_LIKE', 'NOTE_COLLECT'], COMMENT_REPLY: ['COMMENT', 'REPLY'], FOLLOW: ['FOLLOW'] }
+const items = categories.flatMap((category, categoryIndex) => Array.from({ length: 24 }, (_, index) => ({
+  notificationId: String(categoryIndex * 100 + index + 1), seq: String(300 - categoryIndex * 40 - index),
+  type: types[category][index % types[category].length], category, actor: { userId: String(index + 20), nickname: names[index % names.length], avatar },
+  recipientRole: index % 2 ? 'REPLY_TARGET' : 'OWNER', noteId: '500', commentId: '503', replyCommentId: '502',
+  occurredAt: '2026-11-14T10:30:00+08:00', read: index > 5,
+  contentStatus: index === 4 ? 'UNAVAILABLE' : index === 5 ? 'TEMPORARY_UNAVAILABLE' : 'AVAILABLE',
+  preview: index === 4 || index === 5 ? null : { title: '在书店遇见一段缓慢的下午', cover: category === 'FOLLOW' ? '' : avatar, summary: category === 'COMMENT_REPLY' || (category === 'LIKE_COLLECTION' && index % 3 === 1) ? '是的，下午四点阳光会落在桌面上。' : '', imageUrl: fixtureCase === 'picture' && (category === 'COMMENT_REPLY' || (category === 'LIKE_COLLECTION' && index % 3 === 1)) ? avatar : '' }
+})))
+const summary = () => ({ unreadCounts: Object.fromEntries(categories.map(category => [category, items.filter(item => item.category === category && !item.read).length + 100])), totalUnread: items.filter(item => !item.read).length + 300, lastSeq: '300', revision: String(revision), readAllSeq: {} })
+const root = { commentId: '501', noteId: '500', userId: '30', avatar, nickname: '月亮书店', content: '最喜欢那扇靠窗的位置，下次也想在那里读书。', likeTotal: 8, childCommentTotal: 2, level: 1, liked: false, createTime: '今天 10:00' }
+const repliedTo = { commentId: '502', noteId: '500', userId: '31', parentId: '501', avatar, nickname: '沿着河走', content: '窗外的树影也很好看。', likeTotal: 3, level: 2, liked: false, createTime: '今天 10:10' }
+const target = { commentId: '503', noteId: '500', userId: '32', parentId: '501', replyUserId: '31', avatar, nickname: '林间小路', content: '是的，下午四点阳光会落在桌面上。', likeTotal: 2, level: 2, liked: true, createTime: '今天 10:30' }
+const deep = fixtureCase === 'deep'
+const fixtureRoot = deep ? { ...root, commentId: '100', childCommentTotal: 14 } : root
+const fixtureReply = { ...repliedTo, parentId: fixtureRoot.commentId }
+const fixtureTarget = { ...target, parentId: fixtureRoot.commentId, imageUrl: fixtureCase === 'picture' ? avatar : '', content: fixtureCase === 'picture' ? '' : target.content }
+const otherRoots = Array.from({ length: 29 }, (_, index) => ({ ...root, commentId: String(1000 + index), childCommentTotal: 0, nickname: `读者${index + 1}`, content: `笔记中的第${index + 1}条评论` }))
+const fixtureChildren = deep ? [...Array.from({ length: 12 }, (_, index) => ({ ...fixtureReply, commentId: String(490 + index), content: `前面的第${index + 1}条回复` })), fixtureReply, fixtureTarget] : [fixtureReply, fixtureTarget]
+const fixtureRoots = deep ? [...otherRoots.slice(0, 20), { ...fixtureRoot, firstReplyComment: fixtureChildren[0] }, ...otherRoots.slice(20)] : [{ ...fixtureRoot, firstReplyComment: fixtureReply }, { ...root, commentId: '600', childCommentTotal: 0, nickname: '另一位读者', content: '希望下次也能偶遇这样的书店。' }]
+axios.defaults.adapter = async config => {
+  const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data || {}
+  let data = null
+  let totalCount = 12
+  let totalPage = 1
+  if (config.url === '/notification/summary') data = summary()
+  if (config.url === '/notification/list') {
+    const filtered = items.filter(item => item.category === body.category)
+    const offset = Number(body.cursor || 0)
+    data = { items: filtered.slice(offset, offset + 20), nextCursor: offset + 20 < filtered.length ? String(offset + 20) : null, hasMore: offset + 20 < filtered.length, snapshotSeq: '300', revision: String(revision) }
+  }
+  if (config.url === '/notification/read') {
+    items.find(item => item.notificationId === body.notificationId).read = true
+    revision += 1
+    data = { changed: true, notificationId: body.notificationId, read: true, revision: String(revision), summary: summary() }
+  }
+  if (config.url === '/notification/read-all') {
+    items.filter(item => item.category === body.category && BigInt(item.seq) <= BigInt(body.snapshotSeq)).forEach(item => { item.read = true })
+    revision += 1
+    data = { changed: true, revision: String(revision), summary: summary() }
+  }
+  if (config.url === '/notification/read-state') data = { items: items.filter(item => body.notificationIds.includes(item.notificationId)).map(({ notificationId, read }) => ({ notificationId, read })), revision: String(revision), readAllSeq: {} }
+  if (config.url === '/note/detail') data = { id: '500', creatorId: '40', creatorName: '一页晚风', avatar, type: 0, imgUris: [avatar], title: '在书店遇见一段缓慢的下午', content: Array(10).fill('偶然走进街角的书店，选一本书，把时间交给文字。窗边有光，也有一段安静的下午。').join('\n\n'), updateTime: '2026-11-14', likeTotal: 21, collectTotal: 10, commentTotal: 12 }
+  if (config.url === '/comment/context') data = { mode: 'RELATED', noteId: '500', targetCommentId: '503', unavailableReason: null, rootCommentId: fixtureRoot.commentId, rootPageNo: deep ? 3 : 1, childPageNo: deep ? 3 : 1, rootPageSize: 10, childPageSize: 6, root: fixtureRoot, target: fixtureTarget, repliedTo: fixtureReply }
+  if (config.url === '/comment/list') {
+    const offset = ((body.pageNo || 1) - 1) * 10
+    data = fixtureRoots.slice(offset, offset + 10)
+    totalCount = fixtureRoots.length
+    totalPage = Math.ceil(totalCount / 10)
+  }
+  if (config.url === '/comment/child/list') {
+    const offset = ((body.pageNo || 1) - 1) * 6
+    data = fixtureChildren.slice(offset, offset + 6)
+    totalCount = fixtureChildren.length
+    totalPage = Math.ceil(totalCount / 6)
+  }
+  if (config.url === '/note/isLikedAndCollectedData') data = { isLiked: false, isCollected: false }
+  if (config.url === '/user/profile') data = { userId: body.userId || '10', nickname: '合成数据用户', avatar, backgroundImg: '', noteTotal: 0, fansTotal: 0, followingTotal: 0 }
+  if (config.url === '/notification/list' && fixtureCase === 'empty') data.items = []
+  if (config.url === '/comment/context' && fixtureCase === 'deleted') data = { mode: 'RELATED', noteId: '500', targetCommentId: '503', unavailableReason: 'COMMENT_UNAVAILABLE', root: null, target: null, repliedTo: null }
+  const response = { success: true, data, totalCount, pageNo: body.pageNo || 1, totalPage }
+  if (config.url === '/notification/list' && fixtureCase === 'error') { response.success = false; response.message = '合成测试：服务暂时不可用' }
+  return { data: response, status: 200, statusText: 'OK', headers: {}, config }
+}
+window.fetch = async () => new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(`event: ready\ndata: {"revision":"${revision}","lastSeq":"300"}\n\n`)) } }), { headers: { 'Content-Type': 'text/event-stream' } })
+const pinia = createPinia()
+const app = createApp(App)
+app.use(pinia)
+const user = useUserStore()
+user.setToken('synthetic-preview-only')
+user.setProfile({ userId: '10', nickname: '界面验证用户', avatar })
+await router.replace('/notifications')
+app.use(router)
+app.mount('#app')
+</script></body></html>

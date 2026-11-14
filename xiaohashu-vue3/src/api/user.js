@@ -6,9 +6,9 @@ const API_PREFIX = '/user'
 /**
  * 获取用户个人资料
  */
-export function getUserProfile(userId) {
+export function getUserProfile(userId, options) {
   const id = userId === 'undefined' || userId === undefined || userId === null ? null : userId
-  return axios.post(`${API_PREFIX}/profile`, id === null ? {} : { userId: id })
+  return axios.post(`${API_PREFIX}/profile`, id === null ? {} : { userId: id }, options)
 }
 
 /**

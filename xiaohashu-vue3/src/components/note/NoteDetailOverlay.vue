@@ -21,14 +21,14 @@
       </svg>
     </button>
 
-    <div class="note-overlay__card" data-overlay-card>
-      <NoteDetailContent :note-id="noteId" />
+    <div ref="cardScrollRef" class="note-overlay__card" data-overlay-card>
+      <NoteDetailContent :note-id="noteId" :target-comment-id="targetCommentId" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NoteDetailContent from '@/components/note/NoteDetailContent.vue'
 import { playOpenMorph } from '@/composables/noteMorph'
@@ -48,18 +48,24 @@ const noteStore = useNoteStore()
 const { closeNote } = useNoteTransition()
 
 const overlayRef = ref(null)
+const cardScrollRef = ref(null)
+provide('noteOverlayScrollContainer', cardScrollRef)
+const targetCommentId = computed(() => typeof route.query.commentId === 'string' ? route.query.commentId : '')
 const closing = ref(false)
+let previousBodyOverflow = ''
+let previousDocumentOverflow = ''
 
 // 关闭浮层：回到打开前所在的页面（信息流 / 个人页 / 搜索页），
 // 底层页面全程保持挂载，所以返回后不会重新请求数据、也不会丢失滚动位置。
 // 直接从链接进入时没有可回退的历史记录，此时兜底回到浮层所属的父页面。
 const close = () => {
   const state = window.history.state
-  if (state?.back && state.back !== route.fullPath) {
+  const parentPath = route.path.replace(/\/note\/[^/]+$/, '') || '/discover'
+  if (state?.back && state.back.split('?')[0] === parentPath) {
     router.back()
     return
   }
-  router.replace(route.path.replace(/\/note\/[^/]+$/, '') || '/discover')
+  router.replace(parentPath)
 }
 
 // 关闭时封面沿原路飞回卡片原位；收回动画播完才切换路由，
@@ -80,6 +86,8 @@ const handleKeydown = (event) => {
 // 浮层打开期间锁定背景滚动
 onMounted(async () => {
   document.addEventListener('keydown', handleKeydown)
+  previousBodyOverflow = document.body.style.overflow
+  previousDocumentOverflow = document.documentElement.style.overflow
   document.body.style.overflow = 'hidden'
   document.documentElement.style.overflow = 'hidden'
 
@@ -90,8 +98,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleKeydown)
-  document.body.style.overflow = ''
-  document.documentElement.style.overflow = ''
+  document.body.style.overflow = previousBodyOverflow
+  document.documentElement.style.overflow = previousDocumentOverflow
   // 乐观封面只服务于本次打开，关掉浮层就清掉，避免影响下一篇
   noteStore.setPendingHero(null)
 })

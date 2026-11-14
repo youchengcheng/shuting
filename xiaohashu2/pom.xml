@@ -44,6 +44,7 @@
         <module>xiaohashu-search</module>
         <!-- 评论服务-->
         <module>xiaohashu-comment</module>
+        <module>xiaohashu-notification</module>
 
         <!-- AI 服务（依赖版本独立于本父工程，自管 Spring Boot 3.4.5 + Spring AI） -->
         <module>xiaohashu-ai</module>
@@ -98,6 +99,26 @@
     <!-- 统一依赖管理 -->
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.quanxiaoha</groupId>
+                <artifactId>xiaohashu-note-api</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.quanxiaoha</groupId>
+                <artifactId>xiaohashu-comment-api</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.quanxiaoha</groupId>
+                <artifactId>xiaohashu-notification-api</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.quanxiaoha</groupId>
+                <artifactId>xiaoha-spring-boot-starter-notification-outbox</artifactId>
+                <version>${revision}</version>
+            </dependency>
             <dependency>
                 <groupId>com.quanxiaoha</groupId>
                 <artifactId>xiaoha-common</artifactId>
