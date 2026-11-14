@@ -13,7 +13,7 @@ export function notificationPreview(item) {
   const preview = item.preview || {}
   if (commentTypes.has(item.type)) {
     const imageUrl = preview.imageUrl || ''
-    return { text: imageUrl ? '' : shorten(preview.summary, '查看评论'), imageUrl, cover: '' }
+    return { text: imageUrl ? '' : shorten(preview.summary, '查看评论'), imageUrl, cover: preview.cover || '' }
   }
   return { text: shorten(preview.title || preview.summary, '查看笔记'), imageUrl: '', cover: preview.cover || '' }
 }

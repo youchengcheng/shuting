@@ -4,21 +4,22 @@ import { notificationPreview } from '../src/utils/notificationPresentation.js'
 
 const item = (type, preview, contentStatus = 'AVAILABLE') => ({ type, preview, contentStatus })
 
-test('a comment like shows the liked comment instead of the note title and cover', () => {
+test('a comment like shows the liked comment with its target note cover', () => {
   assert.deepEqual(notificationPreview(item('COMMENT_LIKE', { summary: '被点赞的那条评论', title: '所属笔记的标题', cover: 'note-cover' })),
-    { text: '被点赞的那条评论', imageUrl: '', cover: '' })
+    { text: '被点赞的那条评论', imageUrl: '', cover: 'note-cover' })
 })
 
 test('new comments and replies show the incoming content', () => {
   for (const type of ['COMMENT', 'REPLY']) {
-    assert.equal(notificationPreview(item(type, { summary: '对方刚发来的内容', title: '笔记标题' })).text, '对方刚发来的内容')
+    assert.deepEqual(notificationPreview(item(type, { summary: '对方刚发来的内容', title: '笔记标题', cover: 'note-cover' })),
+      { text: '对方刚发来的内容', imageUrl: '', cover: 'note-cover' })
   }
 })
 
-test('a picture comment shows its image without unrelated text or the note cover', () => {
+test('a picture comment shows its image and target note cover without unrelated text', () => {
   for (const type of ['COMMENT_LIKE', 'COMMENT', 'REPLY']) {
     assert.deepEqual(notificationPreview(item(type, { imageUrl: 'comment-picture', summary: '同一评论的文字', title: '笔记标题', cover: 'note-cover' })),
-      { text: '', imageUrl: 'comment-picture', cover: '' })
+      { text: '', imageUrl: 'comment-picture', cover: 'note-cover' })
   }
 })
 

@@ -4,7 +4,8 @@
       <img :src="item.actor.avatar || defaultAvatar" alt="" class="notification-item__avatar" loading="lazy" />
     </router-link>
     <button type="button" class="notification-item__main" @click="$emit('open', item)">
-      <span class="notification-item__action"><strong>{{ item.actor.nickname || '书亭用户' }}</strong> {{ actionText }}</span>
+      <strong class="notification-item__nickname">{{ item.actor.nickname || '书亭用户' }}</strong>
+      <span class="notification-item__action">{{ actionText }}</span>
       <span class="notification-item__time"><time :datetime="item.occurredAt">{{ displayTime }}</time></span>
       <img v-if="preview.imageUrl" :src="preview.imageUrl" alt="评论图片" class="notification-item__comment-image" loading="lazy" />
       <span v-else-if="preview.text" class="notification-item__preview">{{ preview.text }}</span>
@@ -35,13 +36,12 @@ const displayTime = computed(() => {
 .notification-item__avatar-link { flex: none; border-radius: var(--radius-pill); }
 .notification-item__avatar { width: 44px; height: 44px; object-fit: cover; border-radius: var(--radius-pill); background: var(--color-canvas-sunken); }
 .notification-item__main { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0; border: 0; background: transparent; text-align: left; color: var(--color-ink-soft); cursor: pointer; }
-.notification-item__action { font-size: 15px; line-height: 1.5; }
-.notification-item__action strong { font-weight: 500; color: var(--color-ink); overflow-wrap: anywhere; }
+.notification-item__nickname { max-width: 100%; font-size: 15px; line-height: 1.5; font-weight: 500; color: var(--color-ink); overflow-wrap: anywhere; }
+.notification-item__action { font-size: 13px; line-height: 1.5; color: var(--color-ink-soft); }
 .notification-item__time { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--color-ink-soft); font-variant-numeric: tabular-nums; }
 .notification-item__preview { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14px; line-height: 1.6; }
 .notification-item__comment-image { width: 96px; height: 72px; object-fit: contain; border-radius: var(--radius-control); background: var(--color-canvas-sunken); }
 .notification-item__cover-link { flex: none; padding: 0; border: 0; border-radius: var(--radius-control); cursor: pointer; background: var(--color-canvas-sunken); }
 .notification-item__cover { width: 64px; height: 72px; border-radius: var(--radius-control); object-fit: cover; }
-.notification-item__main:hover .notification-item__action { text-decoration: underline; text-underline-offset: 3px; }
-@media (max-width: 767px) { .notification-item { gap: 10px; padding: 18px 12px; flex-wrap: wrap; } .notification-item__cover { width: 48px; height: 58px; } }
+@media (max-width: 767px) { .notification-item { gap: 10px; padding: 18px 12px; } .notification-item__cover { width: 48px; height: 58px; } }
 </style>
