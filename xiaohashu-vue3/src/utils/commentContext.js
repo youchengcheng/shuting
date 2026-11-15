@@ -1,32 +1,75 @@
+// 整理相关评论及回复的展示数据
 export function mapRelatedComments(context) {
-  if (!context?.target) return []
+  if (!context?.target) {
+    return []
+  }
   const root = context.root || context.target
-  const normalize = item => ({ ...item, commentId: String(item.commentId), replyUserName: item.replyUserName || '', likeTotal: Number(item.likeTotal || 0), childCommentTotal: 0, hasMoreChildComments: false })
+  const normalize = item => ({
+    ...item,
+    commentId: String(item.commentId),
+    replyUserName: item.replyUserName || '',
+    likeTotal: Number(item.likeTotal || 0),
+    childCommentTotal: 0,
+    hasMoreChildComments: false
+  })
   const children = [context.repliedTo, context.target].filter(Boolean)
     .filter((item, index, items) => String(item.commentId) !== String(root.commentId) && items.findIndex(other => String(other.commentId) === String(item.commentId)) === index)
-    .map(item => ({ ...normalize(item), replyUserName: item.replyUserId && String(item.replyUserId) === String(root.userId) ? root.nickname : item === context.target ? context.repliedTo?.nickname || '' : '' }))
-  return [{ ...normalize(root), childComments: children, childCommentTotal: children.length }]
+    .map(item => ({
+      ...normalize(item),
+      replyUserName: item.replyUserId && String(item.replyUserId) === String(root.userId) ? root.nickname : item === context.target ? context.repliedTo?.nickname || '' : ''
+    }))
+  return [{
+    ...normalize(root),
+    childComments: children,
+    childCommentTotal: children.length
+  }]
 }
 
-// Capture mutable input and its owner before the idempotency-token await.
+// 获取幂等 Token 前保存评论内容和所属会话，避免等待期间输入发生变化
 export function captureCommentSubmission({ noteId, content, imageUrl, reply, profile, session, generation, mode }) {
-  return { noteId: String(noteId), content, imageUrl, reply: reply ? { ...reply } : null, profile: { ...profile }, session, generation, mode }
+  return {
+    noteId: String(noteId),
+    content,
+    imageUrl,
+    reply: reply ? { ...reply } : null,
+    profile: { ...profile },
+    session,
+    generation,
+    mode
+  }
 }
 
-export const createCommentPageState = () => ({ pages: {}, totalPages: 0, totalCount: 0 })
+// 初始化评论分页状态
+export const createCommentPageState = () => ({
+  pages: {},
+  totalPages: 0,
+  totalCount: 0
+})
 
+// 统一评论 ID 和点赞状态
 export function normalizeComment(comment) {
-  const normalized = { ...comment, commentId: String(comment.commentId), liked: !!comment.liked }
+  const normalized = {
+    ...comment,
+    commentId: String(comment.commentId),
+    liked: !!comment.liked
+  }
   for (const key of ['noteId', 'userId', 'parentId', 'replyCommentId', 'replyUserId']) {
-    if (comment[key] !== null && comment[key] !== undefined) normalized[key] = String(comment[key])
+    if (comment[key] !== null && comment[key] !== undefined) {
+      normalized[key] = String(comment[key])
+    }
   }
   return normalized
 }
 
+// 合并评论分页数据，保留已加载评论的对象
 export function mergeCommentPage(paging, response, mapItem = normalizeComment) {
-  if (!response.success) throw new Error(response.message || '评论加载失败，请重试')
+  if (!response.success) {
+    throw new Error(response.message || '评论加载失败，请重试')
+  }
   const pageNo = Number(response.pageNo)
-  if (!Number.isInteger(pageNo) || pageNo < 1) throw new Error('评论加载失败，请重试')
+  if (!Number.isInteger(pageNo) || pageNo < 1) {
+    throw new Error('评论加载失败，请重试')
+  }
   const existing = new Map(Object.values(paging.pages).flat().map(item => [String(item.commentId), item]))
   paging.pages[pageNo] = (response.data || []).map(item => {
     const previous = existing.get(String(item.commentId))
@@ -37,24 +80,30 @@ export function mergeCommentPage(paging, response, mapItem = normalizeComment) {
   paging.totalCount = Math.max(0, Number(response.totalCount) || 0)
 }
 
+// 按页码整理评论列表，过滤重复项和已删除评论
 export function flattenCommentPages(paging, deletedIds = new Set()) {
   const seen = new Set()
   return Object.keys(paging.pages).map(Number).sort((a, b) => a - b).flatMap(pageNo => paging.pages[pageNo]).filter(item => {
     const id = String(item.commentId)
-    if (seen.has(id) || deletedIds.has(id)) return false
+    if (seen.has(id) || deletedIds.has(id)) {
+      return false
+    }
     seen.add(id)
     return true
   })
 }
 
+// 查找第一个未加载的评论页码
 export function nextMissingCommentPage(paging) {
   for (let pageNo = 1; pageNo <= paging.totalPages; pageNo += 1) {
-    if (!Object.hasOwn(paging.pages, pageNo)) return pageNo
+    if (!Object.hasOwn(paging.pages, pageNo)) {
+      return pageNo
+    }
   }
   return null
 }
 
-// A direct jump never marks intervening pages as loaded; visible gaps keep their own entry point.
+// 跳转到目标评论时保留中间未加载的分页，供用户继续加载
 export function commentPageSections(paging, items) {
   const visible = new Map(items.map(item => [String(item.commentId), item]))
   const seen = new Set()
@@ -64,7 +113,9 @@ export function commentPageSections(paging, items) {
     previousPage = Math.max(previousPage, pageNo)
     const comments = (paging?.pages[pageNo] || items).filter(item => {
       const id = String(item.commentId)
-      if (!visible.has(id) || seen.has(id)) return false
+      if (!visible.has(id) || seen.has(id)) {
+        return false
+      }
       seen.add(id)
       return true
     }).map(item => visible.get(String(item.commentId)))
@@ -72,30 +123,59 @@ export function commentPageSections(paging, items) {
   })
 }
 
-// Location page numbers are hints: a concurrent deletion or ranking change can move a row.
+// 定位返回的页码仅作参考，评论删除或排序变化后需要重新查找
 export function createCommentTargetNavigator({ api, sessionOwner, getRoots, getRootPaging, loadRootPage, loadChildPage, onState, onFound }) {
   let generation = 0
   let controller = null
-  const cancel = () => { generation += 1; controller?.abort(); controller = null }
+  const cancel = () => {
+    generation += 1
+    controller?.abort()
+    controller = null
+  }
   const locate = async (noteId, commentId, ownsView = () => true) => {
     cancel()
-    if (!commentId) { onState({ loading: false, error: '', unavailableReason: '' }); return }
+    if (!commentId) {
+      onState({
+        loading: false,
+        error: '',
+        unavailableReason: ''
+      })
+      return
+    }
     const version = generation
     const session = sessionOwner.captureSession()
     const ownController = new AbortController()
     controller = ownController
     const current = () => version === generation && sessionOwner.isCurrentSession(session) && ownsView()
-    const request = { options: { signal: ownController.signal, session }, isCurrent: current }
+    const request = {
+      options: {
+        signal: ownController.signal,
+        session
+      },
+      isCurrent: current
+    }
     const targetId = String(commentId)
     let contextKnown = false
-    onState({ loading: true, error: '', unavailableReason: '' })
+    onState({
+      loading: true,
+      error: '',
+      unavailableReason: ''
+    })
     try {
       const response = await api.getCommentContext(String(noteId), targetId, request.options)
-      if (!current()) return
-      if (!response.success) throw new Error()
+      if (!current()) {
+        return
+      }
+      if (!response.success) {
+        throw new Error()
+      }
       const context = response.data
       if (!context?.target || context.unavailableReason) {
-        onState({ loading: false, error: '', unavailableReason: context?.unavailableReason || 'COMMENT_UNAVAILABLE' })
+        onState({
+          loading: false,
+          error: '',
+          unavailableReason: context?.unavailableReason || 'COMMENT_UNAVAILABLE'
+        })
         return
       }
       contextKnown = true
@@ -104,55 +184,96 @@ export function createCommentTargetNavigator({ api, sessionOwner, getRoots, getR
       const rootHint = Number(context.rootPageNo)
       if (!findRoot() && Number.isInteger(rootHint) && rootHint > 0) {
         await loadRootPage(rootHint, request)
-        if (!current()) return
+        if (!current()) {
+          return
+        }
       }
       while (!findRoot()) {
         const missingPage = nextMissingCommentPage(getRootPaging())
-        if (missingPage === null) break
+        if (missingPage === null) {
+          break
+        }
         await loadRootPage(missingPage, request)
-        if (!current()) return
+        if (!current()) {
+          return
+        }
       }
       const root = findRoot()
-      if (!root) throw new Error()
+      if (!root) {
+        throw new Error()
+      }
       const findTarget = () => targetId === rootId ? root : root.childComments?.find(child => String(child.commentId) === targetId)
       const childHint = Number(context.childPageNo)
       if (!findTarget() && Number.isInteger(childHint) && childHint > 0) {
         await loadChildPage(root, childHint, request)
-        if (!current()) return
+        if (!current()) {
+          return
+        }
       }
       while (!findTarget()) {
         const missingPage = nextMissingCommentPage(root.childPaging || createCommentPageState())
-        if (missingPage === null) break
+        if (missingPage === null) {
+          break
+        }
         await loadChildPage(root, missingPage, request)
-        if (!current()) return
+        if (!current()) {
+          return
+        }
       }
-      if (!findTarget()) throw new Error()
+      if (!findTarget()) {
+        throw new Error()
+      }
       await onFound(targetId, current)
-      if (current()) onState({ loading: false, error: '', unavailableReason: '' })
+      if (current()) {
+        onState({
+          loading: false,
+          error: '',
+          unavailableReason: ''
+        })
+      }
     } catch {
-      if (!current()) return
-      // The target can disappear between its location response and the normal page request.
+      if (!current()) {
+        return
+      }
+      // 定位后目标评论可能已被删除，再次查询确认当前状态
       if (contextKnown) {
         try {
           const latest = await api.getCommentContext(String(noteId), targetId, request.options)
-          if (!current()) return
-          if (latest.success && (!latest.data?.target || latest.data.unavailableReason)) {
-            onState({ loading: false, error: '', unavailableReason: latest.data?.unavailableReason || 'COMMENT_UNAVAILABLE' })
+          if (!current()) {
             return
           }
-        } catch { if (!current()) return }
+          if (latest.success && (!latest.data?.target || latest.data.unavailableReason)) {
+            onState({
+              loading: false,
+              error: '',
+              unavailableReason: latest.data?.unavailableReason || 'COMMENT_UNAVAILABLE'
+            })
+            return
+          }
+        } catch {
+          if (!current()) {
+            return
+          }
+        }
       }
-      onState({ loading: false, error: '相关评论暂时无法定位，请重试', unavailableReason: '' })
+      onState({
+        loading: false,
+        error: '相关评论暂时无法定位，请重试',
+        unavailableReason: ''
+      })
     } finally {
-      if (controller === ownController) controller = null
+      if (controller === ownController) {
+        controller = null
+      }
     }
   }
   return { locate, cancel }
 }
 
+// 将目标评论滚动到可视区域中间
 export function scrollCommentIntoContainer(container, target, behavior = 'auto') {
   const targetRect = target.getBoundingClientRect()
-  // A root comment contains its replies; center only the comment's own content.
+  // 一级评论包含回复列表，滚动定位时只计算评论自身的内容高度
   const actions = target.querySelector(':scope > .comment-item__body > .comment-item__actions')
   const targetHeight = actions ? actions.getBoundingClientRect().bottom - targetRect.top : targetRect.height
   const visibleHeight = container.clientHeight
@@ -162,23 +283,32 @@ export function scrollCommentIntoContainer(container, target, behavior = 'auto')
   container.scrollTo({ top: Math.max(0, Math.min(top, maxTop)), behavior })
 }
 
-// Keep a newly located target stable while images settle; user input immediately owns scrolling.
+// 图片加载期间保持目标评论位置，用户主动滚动时停止定位
 export function createCommentScrollAnchor({ ResizeObserverClass = globalThis.ResizeObserver, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
   let cleanup = () => {}
   const stop = () => cleanup()
   const start = (container, target, { isCurrent = () => true, reducedMotion = false } = {}) => {
     stop()
-    if (!container || !target || !isCurrent()) return false
+    if (!container || !target || !isCurrent()) {
+      return false
+    }
     let observer
     let timer
     let stopped = false
     const events = ['wheel', 'touchstart', 'pointerdown', 'keydown']
     const adjust = () => {
-      if (!isCurrent()) { finish(); return }
-      if (!stopped) scrollCommentIntoContainer(container, target)
+      if (!isCurrent()) {
+        finish()
+        return
+      }
+      if (!stopped) {
+        scrollCommentIntoContainer(container, target)
+      }
     }
     const finish = () => {
-      if (stopped) return
+      if (stopped) {
+        return
+      }
       stopped = true
       observer?.disconnect()
       clearTimer(timer)
@@ -187,18 +317,26 @@ export function createCommentScrollAnchor({ ResizeObserverClass = globalThis.Res
       cleanup = () => {}
     }
     cleanup = finish
-    events.forEach(event => container.addEventListener(event, finish, { capture: true, passive: true }))
+    events.forEach(event => container.addEventListener(event, finish, {
+      capture: true,
+      passive: true
+    }))
     container.addEventListener('load', adjust, true)
     if (ResizeObserverClass) {
       observer = new ResizeObserverClass(adjust)
       observer.observe(container)
       observer.observe(target)
-      for (const child of container.children) observer.observe(child)
+      for (const child of container.children) {
+        observer.observe(child)
+      }
     }
     timer = setTimer(() => {
-      // Fixed image thumbnails reserve their space; slower images elsewhere retain a bounded anchor.
-      if ([...container.querySelectorAll('img')].some(image => !image.complete)) timer = setTimer(finish, 11000)
-      else finish()
+      // 评论缩略图已预留高度，其他图片未加载完成时延长定位等待时间
+      if ([...container.querySelectorAll('img')].some(image => !image.complete)) {
+        timer = setTimer(finish, 11000)
+      } else {
+        finish()
+      }
     }, 4000)
     scrollCommentIntoContainer(container, target, reducedMotion ? 'auto' : 'smooth')
     target.focus?.({ preventScroll: true })

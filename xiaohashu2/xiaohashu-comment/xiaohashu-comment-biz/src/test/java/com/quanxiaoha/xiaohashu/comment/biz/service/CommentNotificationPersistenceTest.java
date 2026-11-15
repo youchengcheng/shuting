@@ -5,14 +5,18 @@ import com.quanxiaoha.xiaohashu.comment.biz.domain.mapper.CommentDOMapper;
 import com.quanxiaoha.xiaohashu.comment.biz.model.bo.CommentBO;
 import com.quanxiaoha.xiaohashu.comment.biz.model.dto.PublishCommentMqDTO;
 import com.quanxiaoha.xiaohashu.comment.biz.rpc.KeyValueRpcService;
+import com.quanxiaoha.xiaohashu.comment.biz.service.impl.CommentNotificationPersistenceServiceImpl;
+import com.quanxiaoha.xiaohashu.comment.biz.util.CommentContentUtils;
 import com.quanxiaoha.xiaohashu.notification.api.dto.NotificationEvent;
 import com.quanxiaoha.xiaohashu.notification.api.outbox.NotificationOutboxWriter;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.*;
+
 import java.time.LocalDateTime;
 import java.util.*;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -20,7 +24,7 @@ class CommentNotificationPersistenceTest {
     CommentDOMapper mapper = mock(CommentDOMapper.class);
     KeyValueRpcService kv = mock(KeyValueRpcService.class);
     NotificationOutboxWriter outbox = mock(NotificationOutboxWriter.class);
-    CommentNotificationPersistenceService service = new CommentNotificationPersistenceService();
+    CommentNotificationPersistenceService service = new CommentNotificationPersistenceServiceImpl();
     @BeforeEach void setup() {
         TransactionTemplate tx = mock(TransactionTemplate.class);
         when(tx.execute(any())).thenAnswer(call -> ((TransactionCallback<?>)call.getArgument(0)).doInTransaction(new SimpleTransactionStatus()));
@@ -32,7 +36,7 @@ class CommentNotificationPersistenceTest {
     CommentBO row(Long id, Long actor) {
         return CommentBO.builder().id(id).noteId(10L).userId(actor).level(2).parentId(100L).replyCommentId(101L)
                 .replyUserId(2L).createTime(LocalDateTime.of(2026,11,14,1,0)).isContentEmpty(false)
-                .contentUuid(CommentNotificationPersistenceService.contentUuid(id)).content("content").build();
+                .contentUuid(CommentContentUtils.contentUuid(id)).content("content").build();
     }
     @Test void onlyExactlyInsertedIdsWriteContentAndNotifyWithReplyPriority() {
         CommentBO old = row(1L, 3L), fresh = row(2L, 3L);
@@ -56,7 +60,7 @@ class CommentNotificationPersistenceTest {
         assertThrows(IllegalStateException.class, () -> service.persist(List.of(another),Map.of(3L,PublishCommentMqDTO.builder().noteCreatorId(2L).build())));
     }
     @Test void contentIdentityIsStableAcrossRedelivery() {
-        assertEquals(CommentNotificationPersistenceService.contentUuid(12L), CommentNotificationPersistenceService.contentUuid(12L));
-        assertNotEquals(CommentNotificationPersistenceService.contentUuid(12L), CommentNotificationPersistenceService.contentUuid(13L));
+        assertEquals(CommentContentUtils.contentUuid(12L), CommentContentUtils.contentUuid(12L));
+        assertNotEquals(CommentContentUtils.contentUuid(12L), CommentContentUtils.contentUuid(13L));
     }
 }

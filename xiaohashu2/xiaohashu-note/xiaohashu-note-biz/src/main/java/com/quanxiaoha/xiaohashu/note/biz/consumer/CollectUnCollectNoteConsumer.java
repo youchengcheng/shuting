@@ -1,18 +1,17 @@
 package com.quanxiaoha.xiaohashu.note.biz.consumer;
 
 import com.google.common.util.concurrent.RateLimiter;
-import com.quanxiaoha.framework.notification.outbox.NotificationOutboxProperties;
-import com.quanxiaoha.xiaohashu.notification.api.dto.*;
-import com.quanxiaoha.xiaohashu.notification.api.outbox.NotificationOutboxWriter;
-import com.quanxiaoha.xiaohashu.note.biz.domain.dataobject.NoteDO;
-import com.quanxiaoha.xiaohashu.note.biz.domain.mapper.NoteDOMapper;
-import org.springframework.transaction.support.TransactionTemplate;
-import java.util.List;
 import com.quanxiaoha.framework.common.util.JsonUtils;
+import com.quanxiaoha.framework.notification.outbox.NotificationEventIsolationWriter;
+import com.quanxiaoha.framework.notification.outbox.NotificationOutboxProperties;
 import com.quanxiaoha.xiaohashu.note.biz.constant.MQConstants;
 import com.quanxiaoha.xiaohashu.note.biz.domain.dataobject.NoteCollectionDO;
+import com.quanxiaoha.xiaohashu.note.biz.domain.dataobject.NoteDO;
 import com.quanxiaoha.xiaohashu.note.biz.domain.mapper.NoteCollectionDOMapper;
+import com.quanxiaoha.xiaohashu.note.biz.domain.mapper.NoteDOMapper;
 import com.quanxiaoha.xiaohashu.note.biz.model.dto.CollectUnCollectNoteMqDTO;
+import com.quanxiaoha.xiaohashu.notification.api.dto.*;
+import com.quanxiaoha.xiaohashu.notification.api.outbox.NotificationOutboxWriter;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.producer.SendCallback;
@@ -24,8 +23,10 @@ import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -43,11 +44,16 @@ public class CollectUnCollectNoteConsumer implements RocketMQListener<Message> {
     private NoteCollectionDOMapper noteCollectionDOMapper;
     @Resource
     private RocketMQTemplate rocketMQTemplate;
-    @Resource private TransactionTemplate transactionTemplate;
-    @Resource private NotificationOutboxWriter notificationOutboxWriter;
-    @Resource private NotificationOutboxProperties notificationProperties;
-    @Resource private NoteDOMapper noteDOMapper;
-    @Resource private com.quanxiaoha.framework.notification.outbox.NotificationEventIsolationWriter isolationWriter;
+    @Resource
+    private TransactionTemplate transactionTemplate;
+    @Resource
+    private NotificationOutboxWriter notificationOutboxWriter;
+    @Resource
+    private NotificationOutboxProperties notificationOutboxProperties;
+    @Resource
+    private NoteDOMapper noteDOMapper;
+    @Resource
+    private NotificationEventIsolationWriter notificationEventIsolationWriter;
 
     // 每秒创建 5000 个令牌
     private RateLimiter rateLimiter = RateLimiter.create(5000);
@@ -83,10 +89,14 @@ public class CollectUnCollectNoteConsumer implements RocketMQListener<Message> {
         CollectUnCollectNoteMqDTO collectUnCollectNoteMqDTO;
         try {
             collectUnCollectNoteMqDTO = JsonUtils.parseObject(bodyJsonStr, CollectUnCollectNoteMqDTO.class);
-            if (collectUnCollectNoteMqDTO == null) throw new IllegalArgumentException("Missing collection payload");
+            if (collectUnCollectNoteMqDTO == null) {
+                throw new IllegalArgumentException("收藏消息内容不能为空");
+            }
         } catch (Exception invalid) {
-            if (!notificationProperties.getEvents().isEnabled()) throw new IllegalArgumentException("Malformed source payload", invalid);
-            isolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Malformed collection payload");
+            if (!notificationOutboxProperties.getEvents().isEnabled()) {
+                throw new IllegalArgumentException("互动源消息格式不正确", invalid);
+            }
+            notificationEventIsolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Malformed collection payload");
             return;
         }
 
@@ -100,15 +110,17 @@ public class CollectUnCollectNoteConsumer implements RocketMQListener<Message> {
         Integer type = collectUnCollectNoteMqDTO.getType();
         // 收藏时间
         LocalDateTime createTime = collectUnCollectNoteMqDTO.getCreateTime();
-        if (notificationProperties.getEvents().isEnabled() && createTime == null) {
-            isolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Collection event has no source occurrence time");
+        // 通知启用后缺少源发生时间的消息不能用于生成通知，先持久化隔离
+        if (notificationOutboxProperties.getEvents().isEnabled() && createTime == null) {
+            notificationEventIsolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Collection event has no source occurrence time");
             log.warn("Isolated collection event without source time: actorId={}, noteId={}", userId, noteId);
             return;
         }
 
-        if (notificationProperties.getEvents().isEnabled()
+        // 校验操作者、笔记 ID 和收藏类型，阻止错误身份进入通知链路
+        if (notificationOutboxProperties.getEvents().isEnabled()
                 && (userId == null || userId <= 0 || noteId == null || noteId <= 0 || !Objects.equals(type, 1))) {
-            isolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Invalid collection source identity or action");
+            notificationEventIsolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Invalid collection source identity or action");
             return;
         }
 
@@ -122,8 +134,8 @@ public class CollectUnCollectNoteConsumer implements RocketMQListener<Message> {
 
         // 添加或更新笔记收藏记录
         Integer insertedRows = transactionTemplate.execute(status -> {
-            // Notification transition is independent from MySQL upsert's affected-row counting.
-            boolean capture = notificationProperties.accepts(createTime);
+            // 根据收藏状态变化判断是否产生通知，避免依赖数据库返回的影响行数
+            boolean capture = notificationOutboxProperties.accepts(createTime);
             NoteCollectionDO previous = capture ? noteCollectionDOMapper.selectRelationForUpdate(userId, noteId) : null;
             int updated = noteCollectionDOMapper.insertOrUpdate(noteCollectionDO);
             if (capture && Objects.equals(type, 1)
@@ -134,15 +146,22 @@ public class CollectUnCollectNoteConsumer implements RocketMQListener<Message> {
                     creatorId = note == null ? null : note.getCreatorId();
                 }
                 if (creatorId == null) {
-                    // Legacy event without recoverable routing cannot create a fabricated historical recipient.
-                    isolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Legacy collection has no recoverable note owner");
+                    // 历史消息无法查到笔记作者时，隔离通知事件
+                    notificationEventIsolationWriter.save(MQConstants.TOPIC_COLLECT_OR_UN_COLLECT, bodyJsonStr, "Legacy collection has no recoverable note owner");
                     log.warn("Isolated notification routing for legacy collection: actorId={}, noteId={}", userId, noteId);
                 } else if (!Objects.equals(creatorId, userId)) {
                     notificationOutboxWriter.save(NotificationEvent.builder()
-                            .producerService("xiaohashu-note").type("NOTE_COLLECT")
+                            .producerService("xiaohashu-note")
+                            .type("NOTE_COLLECT")
                             .businessKey(NotificationBusinessKey.of("NOTE_COLLECT", userId, noteId))
-                            .actorId(userId).noteId(noteId).occurredAt(createTime)
-                            .recipients(List.of(NotificationRecipient.builder().userId(creatorId).role("OWNER").build())).build());
+                            .actorId(userId)
+                            .noteId(noteId)
+                            .occurredAt(createTime)
+                            .recipients(List.of(NotificationRecipient.builder()
+                                    .userId(creatorId)
+                                    .role("OWNER")
+                                    .build()))
+                            .build());
                 }
             }
             return updated;

@@ -9,38 +9,65 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
+
+/**
+ * 通知 Outbox 自动配置
+ */
 @AutoConfiguration
 @EnableConfigurationProperties(NotificationOutboxProperties.class)
 public class NotificationOutboxAutoConfiguration {
+
+    /*
+     * 注册通知事件写入组件
+     * */
     @Bean
     @ConditionalOnMissingBean(NotificationOutboxWriter.class)
-    public NotificationOutboxWriter notificationOutboxWriter(JdbcTemplate jdbc, ObjectMapper mapper,
-             NotificationOutboxProperties properties, @Value("${spring.application.name}") String producerService) {
-        return new JdbcNotificationOutboxWriter(jdbc, mapper, properties, producerService);
+    public NotificationOutboxWriter notificationOutboxWriter(
+            JdbcTemplate jdbcTemplate, ObjectMapper objectMapper,
+            NotificationOutboxProperties notificationOutboxProperties,
+            @Value("${spring.application.name}") String producerService) {
+        return new JdbcNotificationOutboxWriter(jdbcTemplate, objectMapper, notificationOutboxProperties, producerService);
     }
 
+    /*
+     * 注册异常通知事件写入组件
+     * */
     @Bean
     @ConditionalOnMissingBean(NotificationEventIsolationWriter.class)
-    public NotificationEventIsolationWriter notificationEventIsolationWriter(JdbcTemplate jdbc,
-            NotificationOutboxProperties properties, @Value("${spring.application.name}") String producerService) {
-        return new NotificationEventIsolationWriter(jdbc, properties, producerService);
+    public NotificationEventIsolationWriter notificationEventIsolationWriter(
+            JdbcTemplate jdbcTemplate, NotificationOutboxProperties notificationOutboxProperties,
+            @Value("${spring.application.name}") String producerService) {
+        return new NotificationEventIsolationWriter(jdbcTemplate, notificationOutboxProperties, producerService);
     }
 
-    @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
+    /*
+     * 开启事件采集后注册定时投递任务
+     * */
+    @Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(name = "notification.events.enabled", havingValue = "true")
     @EnableScheduling
     static class DispatchConfiguration {
+
+        /*
+         * 注册通知投递组件，启动时检查通知启用时间
+         * */
         @Bean
-        NotificationOutboxDispatcher notificationOutboxDispatcher(JdbcTemplate jdbc, PlatformTransactionManager manager,
-                RocketMQTemplate rocketMQ, @Value("${spring.application.name}") String producerService,
-                NotificationOutboxProperties properties) {
-            properties.accepts(java.time.LocalDateTime.now()); // Refuse capture without an explicit cutoff.
-            return new NotificationOutboxDispatcher(jdbc, new TransactionTemplate(manager), rocketMQ, producerService);
+        NotificationOutboxDispatcher notificationOutboxDispatcher(
+                JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager,
+                RocketMQTemplate rocketMQTemplate,
+                @Value("${spring.application.name}") String producerService,
+                NotificationOutboxProperties notificationOutboxProperties) {
+            // 启用采集前必须配置明确的通知启用时间
+            notificationOutboxProperties.accepts(LocalDateTime.now());
+            return new NotificationOutboxDispatcher(jdbcTemplate, new TransactionTemplate(transactionManager),
+                    rocketMQTemplate, producerService);
         }
     }
 }

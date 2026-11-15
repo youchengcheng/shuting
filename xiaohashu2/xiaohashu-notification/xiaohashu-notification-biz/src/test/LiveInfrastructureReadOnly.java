@@ -1,6 +1,7 @@
+import com.alibaba.druid.filter.config.ConfigTools;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.alibaba.druid.filter.config.ConfigTools;
+
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
@@ -167,7 +168,7 @@ public class LiveInfrastructureReadOnly {
             }
         }
         String ddl = Files.readString(root.resolve("xiaohashu-notification/xiaohashu-notification-biz/src/main/resources/db/notification_module.sql"));
-        Matcher definitions = Pattern.compile("(?is)CREATE TABLE IF NOT EXISTS\\s+(\\w+)\\s*\\((.*?)\\) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;").matcher(ddl);
+        Matcher definitions = Pattern.compile("(?is)CREATE TABLE IF NOT EXISTS\\s+(\\w+)\\s*\\((.*?)\\) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4(?:\\s+COMMENT\\s*=\\s*'(?:''|\\\\.|[^'\\\\])*')?;").matcher(ddl);
         Map<String, String> statements = new LinkedHashMap<>();
         while (definitions.find()) {
             if (!TABLES.contains(definitions.group(1)) || statements.put(definitions.group(1), definitions.group()) != null)
@@ -215,7 +216,7 @@ public class LiveInfrastructureReadOnly {
     private static Object compareDdl(Map<String, Object> tables) throws IOException {
         String ddl = Files.readString(root.resolve("xiaohashu-notification/xiaohashu-notification-biz/src/main/resources/db/notification_module.sql"));
         List<String> differences = new ArrayList<>();
-        Matcher creates = Pattern.compile("(?is)CREATE TABLE IF NOT EXISTS\\s+(\\w+)\\s*\\((.*?)\\) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;").matcher(ddl);
+        Matcher creates = Pattern.compile("(?is)CREATE TABLE IF NOT EXISTS\\s+(\\w+)\\s*\\((.*?)\\) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4(?:\\s+COMMENT\\s*=\\s*'(?:''|\\\\.|[^'\\\\])*')?;").matcher(ddl);
         int compared = 0;
         while (creates.find()) {
             compared++;

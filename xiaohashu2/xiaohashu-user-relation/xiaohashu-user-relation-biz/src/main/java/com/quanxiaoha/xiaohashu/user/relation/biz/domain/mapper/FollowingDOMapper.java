@@ -7,7 +7,12 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 public interface FollowingDOMapper {
+
+    /*
+     * 查询并锁定关注关系
+     * */
     FollowingDO selectRelationForUpdate(@Param("userId") Long userId, @Param("targetId") Long targetId);
+
     int deleteByPrimaryKey(Long id);
 
     int insert(FollowingDO record);

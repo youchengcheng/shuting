@@ -32,10 +32,12 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
         // 获取响应对象
         ServerHttpResponse response = exchange.getResponse();
+        // 响应已提交时，继续向上抛出异常
         if (response.isCommitted()) {
             return Mono.error(ex);
         }
 
+        // 判断是否为通知 SSE 请求
         boolean notificationStream = "/notification/stream".equals(exchange.getRequest().getPath().value());
 
         log.error("==> 全局异常捕获: ", ex);
@@ -56,7 +58,7 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
             //构建响应结果
             result = Response.fail(ResponseCodeEnum.UNAUTHORIZED.getErrorCode(),ResponseCodeEnum.UNAUTHORIZED.getErrorMessage());
         }else {
-            // SSE 建连失败必须有可重试的 HTTP 状态，不能返回 200 JSON 伪装成流。
+            // 通知 SSE 建立连接失败，返回 503 状态码供客户端重试
             if (notificationStream) {
                 response.setStatusCode(HttpStatus.SERVICE_UNAVAILABLE);
             }

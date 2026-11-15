@@ -3,6 +3,8 @@ package com.quanxiaoha.xiaohashu.user.relation.biz.consumer;
 import com.google.common.util.concurrent.RateLimiter;
 import com.quanxiaoha.framework.common.util.DateUtils;
 import com.quanxiaoha.framework.common.util.JsonUtils;
+import com.quanxiaoha.framework.notification.outbox.NotificationEventIsolationWriter;
+import com.quanxiaoha.framework.notification.outbox.NotificationOutboxProperties;
 import com.quanxiaoha.xiaohashu.user.relation.biz.constant.MQConstants;
 import com.quanxiaoha.xiaohashu.user.relation.biz.constant.RedisKeyConstants;
 import com.quanxiaoha.xiaohashu.user.relation.biz.domain.dataobject.FansDO;
@@ -13,6 +15,7 @@ import com.quanxiaoha.xiaohashu.user.relation.biz.enums.FollowUnfollowTypeEnum;
 import com.quanxiaoha.xiaohashu.user.relation.biz.model.dto.CountFollowUnfollowMqDTO;
 import com.quanxiaoha.xiaohashu.user.relation.biz.model.dto.FollowUserMqDTO;
 import com.quanxiaoha.xiaohashu.user.relation.biz.model.dto.UnfollowUserMqDTO;
+import com.quanxiaoha.xiaohashu.user.relation.biz.service.FollowNotificationPersistenceService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.producer.SendCallback;
@@ -21,7 +24,6 @@ import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.spring.annotation.ConsumeMode;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
-
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -60,11 +62,11 @@ public class FollowUnfollowConsumer implements RocketMQListener<Message> {
     @Resource
     private RocketMQTemplate rocketMQTemplate;
     @Resource
-    private com.quanxiaoha.xiaohashu.user.relation.biz.service.FollowNotificationPersistenceService followPersistenceService;
+    private FollowNotificationPersistenceService followNotificationPersistenceService;
     @Resource
-    private com.quanxiaoha.framework.notification.outbox.NotificationOutboxProperties notificationProperties;
+    private NotificationOutboxProperties notificationOutboxProperties;
     @Resource
-    private com.quanxiaoha.framework.notification.outbox.NotificationEventIsolationWriter isolationWriter;
+    private NotificationEventIsolationWriter notificationEventIsolationWriter;
 
     @Override
     public void onMessage(Message message) {
@@ -94,10 +96,14 @@ public class FollowUnfollowConsumer implements RocketMQListener<Message> {
         FollowUserMqDTO followUserMqDTO;
         try {
             followUserMqDTO = JsonUtils.parseObject(bodyJsonStr, FollowUserMqDTO.class);
-            if (followUserMqDTO == null) throw new IllegalArgumentException("Missing follow payload");
+            if (followUserMqDTO == null) {
+                throw new IllegalArgumentException("关注消息内容不能为空");
+            }
         } catch (Exception invalid) {
-            if (!notificationProperties.getEvents().isEnabled()) throw new IllegalArgumentException("Malformed source payload", invalid);
-            isolationWriter.save(MQConstants.TOPIC_FOLLOW_OR_UNFOLLOW, bodyJsonStr, "Malformed follow payload");
+            if (!notificationOutboxProperties.getEvents().isEnabled()) {
+                throw new IllegalArgumentException("互动源消息格式不正确", invalid);
+            }
+            notificationEventIsolationWriter.save(MQConstants.TOPIC_FOLLOW_OR_UNFOLLOW, bodyJsonStr, "Malformed follow payload");
             return;
         }
 
@@ -110,21 +116,23 @@ public class FollowUnfollowConsumer implements RocketMQListener<Message> {
         Long userId = followUserMqDTO.getUserId();
         Long followUserId = followUserMqDTO.getFollowingId();
         LocalDateTime createTime = followUserMqDTO.getCreateTime();
-        if (notificationProperties.getEvents().isEnabled() && createTime == null) {
-            isolationWriter.save(MQConstants.TOPIC_FOLLOW_OR_UNFOLLOW, bodyJsonStr, "Follow event has no source occurrence time");
+        // 通知启用后缺少发生时间的消息须隔离，防止将旧互动判断为新通知
+        if (notificationOutboxProperties.getEvents().isEnabled() && createTime == null) {
+            notificationEventIsolationWriter.save(MQConstants.TOPIC_FOLLOW_OR_UNFOLLOW, bodyJsonStr, "Follow event has no source occurrence time");
             log.warn("Isolated follow event without source time: actorId={}, targetId={}", userId, followUserId);
             return;
         }
 
-        if (notificationProperties.getEvents().isEnabled()
+        // 校验操作者和被关注用户的身份，非法事件不进入业务持久化
+        if (notificationOutboxProperties.getEvents().isEnabled()
                 && (userId == null || userId <= 0 || followUserId == null || followUserId <= 0)) {
-            isolationWriter.save(MQConstants.TOPIC_FOLLOW_OR_UNFOLLOW, bodyJsonStr, "Invalid follow source identity");
+            notificationEventIsolationWriter.save(MQConstants.TOPIC_FOLLOW_OR_UNFOLLOW, bodyJsonStr, "Invalid follow source identity");
             return;
         }
 
         //编程式提交事物
         //Boolean.TRUE.equals()判断返回的值是否为true
-        boolean isSuccess = followPersistenceService.persist(followUserMqDTO);
+        boolean isSuccess = followNotificationPersistenceService.persist(followUserMqDTO);
         log.info("## 数据库添加记录结果：{}", isSuccess);
 
         // 若数据库操作成功，更新 Redis 中被关注用户的 ZSet 粉丝列表

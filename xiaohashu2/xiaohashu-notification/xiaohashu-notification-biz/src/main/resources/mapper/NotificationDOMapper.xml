@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quanxiaoha.xiaohashu.notification.biz.domain.mapper.NotificationDOMapper">
+
+    <!-- 初始化用户通知状态并获取排他锁 -->
+    <insert id="ensureState">
+        INSERT INTO t_notification_user_state(recipient_id,last_seq,revision,like_collection_read_seq,comment_reply_read_seq,follow_read_seq)
+        VALUES(#{id},0,0,0,0,0)
+        ON DUPLICATE KEY UPDATE recipient_id=recipient_id
+    </insert>
+
+    <!-- 锁定用户通知状态 -->
+    <select id="lockState" resultType="com.quanxiaoha.xiaohashu.notification.biz.domain.dataobject.NotificationUserStateDO">
+        SELECT *
+        FROM t_notification_user_state
+        WHERE recipient_id=#{id} FOR UPDATE
+    </select>
+
+    <!-- 查询用户通知状态 -->
+    <select id="state" resultType="com.quanxiaoha.xiaohashu.notification.biz.domain.dataobject.NotificationUserStateDO">
+        SELECT *
+        FROM t_notification_user_state
+        WHERE recipient_id=#{id}
+    </select>
+
+    <!-- 批量查询用户通知状态 -->
+    <select id="states" resultType="com.quanxiaoha.xiaohashu.notification.biz.domain.dataobject.NotificationUserStateDO">
+        SELECT *
+        FROM t_notification_user_state
+        WHERE recipient_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!-- 根据业务键查询通知 -->
+    <select id="byBusinessKey" resultType="com.quanxiaoha.xiaohashu.notification.biz.domain.dataobject.NotificationDO">
+        SELECT  id,business_key,recipient_id,actor_id,type,category,recipient_role,note_id,comment_id,reply_comment_id,occurred_at,seq,read_at,created_at
+        FROM t_notification
+        WHERE recipient_id=#{recipientId}
+        AND business_key=#{businessKey}
+    </select>
+
+    <!-- 根据通知 ID 查询通知 -->
+    <select id="byId" resultType="com.quanxiaoha.xiaohashu.notification.biz.domain.dataobject.NotificationDO">
+        SELECT  id,business_key,recipient_id,actor_id,type,category,recipient_role,note_id,comment_id,reply_comment_id,occurred_at,seq,read_at,created_at
+        FROM t_notification
+        WHERE recipient_id=#{recipientId}
+        AND id=#{id}
+    </select>
+
+    <!-- 新增通知记录 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO t_notification(business_key,recipient_id,actor_id,type,category,recipient_role,note_id,comment_id,reply_comment_id,occurred_at,seq,created_at)
+        VALUES(#{businessKey},#{recipientId},#{actorId},#{type},#{category},#{recipientRole},#{noteId},#{commentId},#{replyCommentId},#{occurredAt},#{seq},NOW())
+    </insert>
+
+    <!-- 推进最新通知序号和版本 -->
+    <update id="advance">
+        UPDATE t_notification_user_state
+        SET last_seq=#{seq},revision=revision+1
+        WHERE recipient_id=#{id}
+    </update>
+
+    <!-- 更新通知已读时间 -->
+    <update id="markRead">
+        UPDATE t_notification
+        SET read_at=NOW()
+        WHERE recipient_id=#{recipientId}
+        AND id=#{id}
+        AND read_at IS NULL
+    </update>
+
+    <!-- 递增通知状态版本 -->
+    <update id="bumpRevision">
+        UPDATE t_notification_user_state
+        SET revision=revision+1
+        WHERE recipient_id=#{id}
+    </update>
+
+    <!-- 更新分类已读水位 -->
+    <update id="setWatermark">
+        UPDATE t_notification_user_state
+        SET revision=revision+1,
+        <choose>
+            <when test="category == 'LIKE_COLLECTION'">
+                like_collection_read_seq
+            </when>
+            <when test="category == 'COMMENT_REPLY'">
+                comment_reply_read_seq
+            </when>
+            <otherwise>
+                follow_read_seq
+            </otherwise>
+        </choose>
+        =#{seq}
+        WHERE recipient_id=#{id}
+    </update>
+
+    <!-- 查询快照内的通知分页 -->
+    <select id="page" resultType="com.quanxiaoha.xiaohashu.notification.biz.domain.dataobject.NotificationDO">
+        SELECT  id,business_key,recipient_id,actor_id,type,category,recipient_role,note_id,comment_id,reply_comment_id,occurred_at,seq,read_at,created_at
+        FROM t_notification
+        WHERE recipient_id=#{recipientId}
+        AND category=#{category}
+        AND seq &lt;= #{snapshot}
+        AND (#{before}=0 OR seq &lt; #{before})
+        ORDER BY seq DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 统计分类未读数量 -->
+    <select id="unread" resultType="long">
+        SELECT COUNT(*)
+        FROM t_notification
+        WHERE recipient_id=#{recipientId}
+        AND category=#{category}
+        AND read_at IS NULL
+        AND seq &gt; #{watermark}
+    </select>
+
+    <!-- 批量查询通知 -->
+    <select id="byIds" resultType="com.quanxiaoha.xiaohashu.notification.biz.domain.dataobject.NotificationDO">
+        SELECT  id,business_key,recipient_id,actor_id,type,category,recipient_role,note_id,comment_id,reply_comment_id,occurred_at,seq,read_at,created_at
+        FROM t_notification
+        WHERE recipient_id=#{recipientId}
+        AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!-- 隔离非法互动事件 -->
+    <insert id="isolate">
+        INSERT IGNORE INTO t_notification_event_error(source,event_identity,payload,reason,created_at)
+        VALUES(#{source},#{identity},#{payload},#{reason},NOW())
+    </insert>
+</mapper>

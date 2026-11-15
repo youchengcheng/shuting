@@ -6,6 +6,7 @@ import com.quanxiaoha.framework.biz.operationlog.aspect.ApiOperationLog;
 import com.quanxiaoha.framework.common.response.PageResponse;
 import com.quanxiaoha.framework.common.response.Response;
 import com.quanxiaoha.xiaohashu.comment.biz.model.vo.*;
+import com.quanxiaoha.xiaohashu.comment.biz.service.CommentInternalQueryService;
 import com.quanxiaoha.xiaohashu.comment.biz.service.CommentService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -26,11 +27,15 @@ public class CommentController {
     @Resource
     private CommentService commentService;
     @Resource
-    private com.quanxiaoha.xiaohashu.comment.biz.service.CommentInternalQueryService internalQueries;
+    private CommentInternalQueryService commentInternalQueryService;
 
+    /*
+     * 查询目标评论及相关评论
+     * */
     @PostMapping("/context")
-    public Response<CommentContextRspVO> context(@Validated @RequestBody CommentContextReqVO request) {
-        return Response.success(internalQueries.context(request));
+    public Response<CommentContextRspVO> context(@Validated @RequestBody CommentContextReqVO commentContextReqVO) {
+        // 由查询服务校验笔记权限，并返回目标评论的层级与定位信息
+        return Response.success(commentInternalQueryService.context(commentContextReqVO));
     }
 
     /*

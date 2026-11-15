@@ -1,29 +1,17 @@
 package com.quanxiaoha.xiaohashu.notification.biz.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.quanxiaoha.xiaohashu.notification.biz.model.NotificationUserState;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Component;
-import java.util.Map;
+import com.quanxiaoha.xiaohashu.notification.biz.domain.dataobject.NotificationUserStateDO;
 
-@Slf4j
-@Component
-public class NotificationChangePublisher {
-    public static final String CHANNEL = "notification:changed:v1";
-    private final StringRedisTemplate redis;
-    private final ObjectMapper json;
+/*
+ * 通知状态变更发布服务
+ * */
+public interface NotificationChangePublisher {
 
-    public NotificationChangePublisher(StringRedisTemplate redis, ObjectMapper json) { this.redis = redis; this.json = json; }
+    // Redis 通知状态变更频道
+    String CHANNEL = "notification:changed:v1";
 
-    public void publish(NotificationUserState state) {
-        try {
-            redis.convertAndSend(CHANNEL, json.writeValueAsString(Map.of("userId", Long.toString(state.getRecipientId()),
-                    "revision", Long.toString(state.getRevision()), "lastSeq", Long.toString(state.getLastSeq()))));
-        } catch (RuntimeException | JsonProcessingException ex) {
-            // This runs after commit. Missing hints are recovered by the stream heartbeat and REST calibration.
-            log.warn("Notification change hint unavailable, userId={}, revision={}", state.getRecipientId(), state.getRevision());
-        }
-    }
+    /*
+     * 事务提交后发布用户通知状态版本
+     * */
+    void publish(NotificationUserStateDO notificationUserStateDO);
 }

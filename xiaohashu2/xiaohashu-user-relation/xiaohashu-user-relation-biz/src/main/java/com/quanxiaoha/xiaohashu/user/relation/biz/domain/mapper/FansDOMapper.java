@@ -6,7 +6,12 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 public interface FansDOMapper {
+
+    /*
+     * 查询并锁定粉丝关系
+     * */
     FansDO selectRelationForUpdate(@Param("userId") Long userId, @Param("targetId") Long targetId);
+
     int deleteByPrimaryKey(Long id);
 
     int insert(FansDO record);

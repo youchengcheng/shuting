@@ -14,6 +14,7 @@
     <div
       class="note-card__media"
       :class="{ 'note-card__media--empty': mediaKind === 'empty' }"
+      :style="{ aspectRatio: mediaAspectRatio }"
       :data-note-cover="note.id ?? note.noteId"
     >
       <img
@@ -22,6 +23,7 @@
         :src="note.cover"
         alt=""
         loading="lazy"
+        @load="onMediaLoad"
         @error="onMediaError"
       />
 
@@ -32,6 +34,7 @@
         :src="note.videoUri"
         preload="metadata"
         muted
+        @loadedmetadata="onMediaLoad"
         @error="onMediaError"
       ></video>
 
@@ -174,15 +177,31 @@ const emit = defineEmits(['click', 'edit', 'top', 'visible', 'delete'])
 // 这里统一兜底为占位图，避免卡片塌陷成一条白条。
 const mediaFailed = ref(false)
 const avatarFailed = ref(false)
+const mediaAspectRatio = ref(3 / 4)
+
+const onMediaLoad = (event) => {
+  const media = event.target
+  const width = media.naturalWidth || media.videoWidth
+  const height = media.naturalHeight || media.videoHeight
+  if (width && height) mediaAspectRatio.value = width / height
+}
 
 const onMediaError = () => {
   mediaFailed.value = true
+  mediaAspectRatio.value = 3 / 4
 }
 
 watch(
-  () => [props.note.cover, props.note.videoUri, props.note.avatar],
+  () => [props.note.cover, props.note.videoUri, props.note.type],
   () => {
     mediaFailed.value = false
+    mediaAspectRatio.value = 3 / 4
+  }
+)
+
+watch(
+  () => props.note.avatar,
+  () => {
     avatarFailed.value = false
   }
 )
@@ -395,7 +414,7 @@ onBeforeUnmount(() => {
 .note-card__image {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   object-fit: cover;
   transition: transform 420ms var(--ease-standard);
 }

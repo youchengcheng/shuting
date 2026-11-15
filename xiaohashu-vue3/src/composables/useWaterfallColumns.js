@@ -26,23 +26,31 @@ export function resolveColumnCount(width, viewportWidth) {
   return matched ? matched.count : 2
 }
 
-/** 按 DOM 顺序依次落到各列，保证阅读顺序从左到右 */
-export function splitIntoColumns(items, columnCount) {
-  const columns = Array.from({ length: columnCount }, () => [])
-  items.forEach((item, index) => {
-    columns[index % columnCount].push(item)
+/** 按列表顺序放入当前最短列；高度相同时优先左侧。 */
+export function createWaterfallLayout(heights, columnCount, columnWidth, columnGap = 16, rowGap = 24) {
+  const columnHeights = Array(columnCount).fill(0)
+  const positions = heights.map((height) => {
+    let column = 0
+    for (let index = 1; index < columnCount; index++) {
+      if (columnHeights[index] < columnHeights[column]) column = index
+    }
+    const top = columnHeights[column]
+    columnHeights[column] += height + rowGap
+    return { column, left: column * (columnWidth + columnGap), top }
   })
-  return columns
+  return { positions, height: heights.length ? Math.max(...columnHeights) - rowGap : 0 }
 }
 
 export function useWaterfallColumns(targetRef) {
   const columnCount = ref(4)
+  const containerWidth = ref(0)
   let observer = null
 
   const measure = () => {
     const element = targetRef.value
     const width = element ? element.clientWidth : window.innerWidth
     if (!width) return
+    containerWidth.value = width
     columnCount.value = resolveColumnCount(width, window.innerWidth)
   }
 
@@ -51,9 +59,8 @@ export function useWaterfallColumns(targetRef) {
     if (typeof ResizeObserver !== 'undefined' && targetRef.value) {
       observer = new ResizeObserver(measure)
       observer.observe(targetRef.value)
-    } else {
-      window.addEventListener('resize', measure)
     }
+    window.addEventListener('resize', measure)
   })
 
   onBeforeUnmount(() => {
@@ -61,5 +68,5 @@ export function useWaterfallColumns(targetRef) {
     window.removeEventListener('resize', measure)
   })
 
-  return { columnCount, measure }
+  return { columnCount, containerWidth, measure }
 }

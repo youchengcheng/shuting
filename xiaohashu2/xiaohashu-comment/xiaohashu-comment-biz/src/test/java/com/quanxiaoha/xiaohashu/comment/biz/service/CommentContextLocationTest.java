@@ -7,11 +7,15 @@ import com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentDO;
 import com.quanxiaoha.xiaohashu.comment.biz.domain.mapper.*;
 import com.quanxiaoha.xiaohashu.comment.biz.model.vo.*;
 import com.quanxiaoha.xiaohashu.comment.biz.rpc.*;
+import com.quanxiaoha.xiaohashu.comment.biz.service.impl.CommentInternalQueryServiceImpl;
+import com.quanxiaoha.xiaohashu.comment.biz.service.impl.CommentReplyValidatorImpl;
 import org.junit.jupiter.api.*;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.test.util.ReflectionTestUtils;
+
 import java.util.*;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -22,16 +26,16 @@ class CommentContextLocationTest {
     private final UserRpcService users = mock(UserRpcService.class);
     private final RedisTemplate<String, Object> redis = mock(RedisTemplate.class);
     private final ZSetOperations<String, Object> zset = mock(ZSetOperations.class);
-    private final CommentInternalQueryService service = new CommentInternalQueryService();
+    private final CommentInternalQueryService service = new CommentInternalQueryServiceImpl();
     private final CommentDO root = comment(100L, 1, 1L);
     private final CommentDO child = comment(200L, 2, 100L);
 
     @BeforeEach void setup() {
-        CommentReplyValidator validator = new CommentReplyValidator();
+        CommentReplyValidator validator = new CommentReplyValidatorImpl();
         ReflectionTestUtils.setField(validator, "commentDOMapper", mapper);
         ReflectionTestUtils.setField(service, "commentDOMapper", mapper);
         ReflectionTestUtils.setField(service, "commentLikeDOMapper", mock(CommentLikeDOMapper.class));
-        ReflectionTestUtils.setField(service, "replyValidator", validator);
+        ReflectionTestUtils.setField(service, "commentReplyValidator", validator);
         ReflectionTestUtils.setField(service, "noteAccessService", access);
         ReflectionTestUtils.setField(service, "keyValueRpcService", kv);
         ReflectionTestUtils.setField(service, "userRpcService", users);

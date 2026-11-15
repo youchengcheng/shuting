@@ -5,10 +5,13 @@ import com.quanxiaoha.xiaohashu.notification.api.dto.NotificationEvent;
 import com.quanxiaoha.xiaohashu.notification.biz.config.NotificationSettings;
 import com.quanxiaoha.xiaohashu.notification.biz.consumer.NotificationMessageHandler;
 import com.quanxiaoha.xiaohashu.notification.biz.service.NotificationService;
+
 import org.apache.rocketmq.common.message.MessageExt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.test.util.ReflectionTestUtils;
+
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.*;
@@ -30,9 +33,12 @@ class NotificationMessageHandlerTest {
         time.addDeserializer(java.time.LocalDateTime.class, new com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer(
                 java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         json.registerModule(time);
-        // The application initializes JsonUtils with its project-format Jackson mapper.
+        // 使用项目的 Jackson 配置初始化 JsonUtils
         com.quanxiaoha.framework.common.util.JsonUtils.init(json);
-        handler = new NotificationMessageHandler(json, notifications, settings);
+        handler = new NotificationMessageHandler();
+        ReflectionTestUtils.setField(handler, "objectMapper", json);
+        ReflectionTestUtils.setField(handler, "notificationService", notifications);
+        ReflectionTestUtils.setField(handler, "notificationSettings", settings);
     }
 
     @Test
@@ -100,7 +106,7 @@ class NotificationMessageHandlerTest {
         handler.committed(message(event.replace("TIME", "2026-11-14 00:00:00")));
         handler.committed(message(event.replace("TIME", "2026-11-14T00:00:00").replace("xiaohashu-note", "unknown-service")));
         verify(notifications, times(2)).consume(any());
-        verify(notifications).isolate(eq("NotificationEventTopic"), anyString(), anyString(), eq("Unexpected committed event producer"));
+        verify(notifications).isolate(eq("NotificationEventTopic"), anyString(), anyString(), eq("已提交的通知事件来源服务不匹配"));
     }
 
     private static MessageExt message(String payload) {

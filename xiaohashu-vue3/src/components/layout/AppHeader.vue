@@ -185,10 +185,35 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.header-notification { position: relative; display: none; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; color: var(--color-ink); border-radius: var(--radius-pill); }
-.header-notification svg { width: 22px; height: 22px; }
-.header-notification .notification-badge { position: absolute; top: 0; right: -5px; }
-@media (max-width: 1023px) { .header-notification { display: inline-flex; } }
+.header-notification {
+  position: relative;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  color: var(--color-ink);
+  border-radius: var(--radius-pill);
+}
+
+.header-notification svg {
+  width: 22px;
+  height: 22px;
+}
+
+.header-notification .notification-badge {
+  position: absolute;
+  top: 0;
+  right: -5px;
+}
+
+@media (max-width: 1023px) {
+  .header-notification {
+    display: inline-flex;
+  }
+}
+
 .app-header {
   position: fixed;
   top: 0;
@@ -522,6 +547,10 @@ onBeforeUnmount(() => {
     height: 40px;
     padding-left: 16px;
   }
-  .actions { flex-shrink: 0; gap: 8px; }
+  .actions {
+    flex-shrink: 0;
+    gap: 8px;
+  }
+
 }
 </style>

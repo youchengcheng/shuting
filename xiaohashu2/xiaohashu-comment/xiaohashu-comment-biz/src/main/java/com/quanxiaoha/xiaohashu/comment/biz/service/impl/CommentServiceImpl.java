@@ -29,11 +29,14 @@ import com.quanxiaoha.xiaohashu.comment.biz.model.vo.*;
 import com.quanxiaoha.xiaohashu.comment.biz.retry.SendMqRetryHelper;
 import com.quanxiaoha.xiaohashu.comment.biz.rpc.DistributedIdGeneratorRpcService;
 import com.quanxiaoha.xiaohashu.comment.biz.rpc.KeyValueRpcService;
+import com.quanxiaoha.xiaohashu.comment.biz.rpc.NoteAccessService;
 import com.quanxiaoha.xiaohashu.comment.biz.rpc.UserRpcService;
+import com.quanxiaoha.xiaohashu.comment.biz.service.CommentReplyValidator;
 import com.quanxiaoha.xiaohashu.comment.biz.service.CommentService;
 import com.quanxiaoha.xiaohashu.kv.api.KeyValueFeignApi;
 import com.quanxiaoha.xiaohashu.kv.dto.rep.FindCommentContentReqDTO;
 import com.quanxiaoha.xiaohashu.kv.dto.resp.FindCommentContentRspDTO;
+import com.quanxiaoha.xiaohashu.note.dto.NoteMetadataDTO;
 import com.quanxiaoha.xiaohashu.user.dto.resp.FindUserByIdRspDTO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -89,9 +92,9 @@ public class CommentServiceImpl implements CommentService {
     @Resource
     private TransactionTemplate transactionTemplate;
     @Resource
-    private com.quanxiaoha.xiaohashu.comment.biz.rpc.NoteAccessService noteAccessService;
+    private NoteAccessService noteAccessService;
     @Resource
-    private com.quanxiaoha.xiaohashu.comment.biz.service.CommentReplyValidator replyValidator;
+    private CommentReplyValidator commentReplyValidator;
 
     /**
      * 评论详情本地缓存
@@ -118,9 +121,12 @@ public class CommentServiceImpl implements CommentService {
 
         //获取笔记发布者id
         Long userId = LoginUserContextHolder.getUserId();
-        com.quanxiaoha.xiaohashu.note.dto.NoteMetadataDTO note = noteAccessService.requireAccessible(publishCommentReqVO.getNoteId(), userId);
+        //校验笔记访问权限和被回复评论归属
+        NoteMetadataDTO note = noteAccessService.requireAccessible(publishCommentReqVO.getNoteId(), userId);
         Long replyId = publishCommentReqVO.getReplyCommentId();
-        if (replyId != null && replyId > 0) replyValidator.requireTarget(publishCommentReqVO.getNoteId(), replyId);
+        if (replyId != null && replyId > 0) {
+            commentReplyValidator.requireTarget(publishCommentReqVO.getNoteId(), replyId);
+        }
         //调用分布式 id 生成服务
         String commentId = distributedIdGeneratorRpcService.generateCommentId();
 
@@ -331,10 +337,12 @@ public class CommentServiceImpl implements CommentService {
     public PageResponse<FindChildCommentItemRspVO> findChildCommentPageList(FindChildCommentPageListReqVO findChildCommentPageListReqVO) {
         //父评论id
         Long parentCommentId = findChildCommentPageListReqVO.getParentCommentId();
+        //校验父评论层级和所属笔记的访问权限
         CommentDO parent = commentDOMapper.selectByPrimaryKey(parentCommentId);
-        if (parent == null || !Objects.equals(parent.getLevel(), CommentLevelEnum.ONE.getCode()))
+        if (parent == null || !Objects.equals(parent.getLevel(), CommentLevelEnum.ONE.getCode())) {
             throw new BizException(ResponseCodeEnum.PARENT_COMMENT_NOT_FOUND);
-        replyValidator.requireRoot(parent.getNoteId(), parent);
+        }
+        commentReplyValidator.requireRoot(parent.getNoteId(), parent);
         noteAccessService.requireAccessible(parent.getNoteId(), LoginUserContextHolder.getUserId());
         //当前页码
         Integer pageNo = findChildCommentPageListReqVO.getPageNo();
@@ -471,9 +479,11 @@ public class CommentServiceImpl implements CommentService {
         //当前登录用户id
         Long userId = LoginUserContextHolder.getUserId();
 
-        // Read authoritative routing before the asynchronous action; cached existence cannot identify the recipient.
+        // 异步点赞前查询评论归属，获取通知接收者并校验笔记访问权限
         CommentDO likedComment = commentDOMapper.selectByPrimaryKey(commentId);
-        if (likedComment == null) throw new BizException(ResponseCodeEnum.COMMENT_NOT_FOUND);
+        if (likedComment == null) {
+            throw new BizException(ResponseCodeEnum.COMMENT_NOT_FOUND);
+        }
         noteAccessService.requireAccessible(likedComment.getNoteId(), userId);
 
         // 2. 判断目标评论，是否已经被点赞

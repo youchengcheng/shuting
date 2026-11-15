@@ -28,9 +28,9 @@ class CommentSourceIsolationTest {
     CommentNotificationPersistenceService persistence=mock(CommentNotificationPersistenceService.class);
     @BeforeEach void setup() {
         NotificationOutboxProperties props=new NotificationOutboxProperties(); props.getEvents().setEnabled(true); props.setEnabledAt(LocalDateTime.of(2026,11,14,0,0));
-        ReflectionTestUtils.setField(consumer,"notificationProperties",props); ReflectionTestUtils.setField(consumer,"isolationWriter",isolation);
-        ReflectionTestUtils.setField(consumer,"commentDOMapper",mapper); ReflectionTestUtils.setField(consumer,"replyValidator",validator);
-        ReflectionTestUtils.setField(consumer,"noteAccessService",access); ReflectionTestUtils.setField(consumer,"notificationPersistence",persistence);
+        ReflectionTestUtils.setField(consumer,"notificationOutboxProperties",props); ReflectionTestUtils.setField(consumer,"notificationEventIsolationWriter",isolation);
+        ReflectionTestUtils.setField(consumer,"commentDOMapper",mapper); ReflectionTestUtils.setField(consumer,"commentReplyValidator",validator);
+        ReflectionTestUtils.setField(consumer,"noteAccessService",access); ReflectionTestUtils.setField(consumer,"commentNotificationPersistenceService",persistence);
     }
     PublishCommentMqDTO event() { return PublishCommentMqDTO.builder().commentId(1L).noteId(2L).creatorId(3L).noteCreatorId(4L).createTime(LocalDateTime.of(2026,11,14,1,0)).build(); }
     MessageExt message(String payload,int retries) { MessageExt msg=new MessageExt(); msg.setBody(payload.getBytes(StandardCharsets.UTF_8)); msg.setReconsumeTimes(retries); return msg; }

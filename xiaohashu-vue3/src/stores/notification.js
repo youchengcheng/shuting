@@ -5,6 +5,11 @@ import * as api from '@/api/notification'
 import { createNotificationController, emptyNotificationState } from '@/utils/notificationState'
 
 export const useNotificationStore = defineStore('notification', () => {
+  // 通知列表、未读数量和已读状态
   const state = reactive(emptyNotificationState())
-  return { ...toRefs(state), ...createNotificationController(state, api, useUserStore()) }
+
+  return {
+    ...toRefs(state),
+    ...createNotificationController(state, api, useUserStore())
+  }
 })

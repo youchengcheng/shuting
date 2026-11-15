@@ -1,5 +1,11 @@
 <template>
-  <div ref="rootRef" :data-comment-id="comment.commentId" :tabindex="isTarget ? -1 : undefined" class="comment-item" :class="{ 'comment-item--reply': isReply, 'new-comment-animation': comment.isNewComment, 'comment-item--target': isTarget }">
+  <div
+    ref="rootRef"
+    :data-comment-id="comment.commentId"
+    :tabindex="isTarget ? -1 : undefined"
+    class="comment-item"
+    :class="{ 'comment-item--reply': isReply, 'new-comment-animation': comment.isNewComment, 'comment-item--target': isTarget }"
+  >
     <img :src="comment.avatar" class="comment-item__avatar" :alt="comment.nickname" />
 
     <div class="comment-item__body" :class="{ 'comment-item__body--has-more': canDelete }">
@@ -89,7 +95,13 @@
       <template v-if="comment.childCommentTotal > 0 || comment.childComments?.length">
         <div v-if="comment.childComments && comment.childComments.length > 0" class="comment-item__children">
           <template v-for="section in childSections" :key="section.pageNo">
-            <button v-if="section.firstMissingPage" type="button" class="comment-item__more" :disabled="comment.isLoadingChildComments" @click="handleExpandReplies(comment, section.firstMissingPage)">查看更多回复</button>
+            <button
+              v-if="section.firstMissingPage"
+              type="button"
+              class="comment-item__more"
+              :disabled="comment.isLoadingChildComments"
+              @click="handleExpandReplies(comment, section.firstMissingPage)"
+            >查看更多回复</button>
             <CommentItem
               v-for="childComment in section.comments"
               :key="childComment.commentId"
@@ -131,7 +143,10 @@ import UserPopover from '@/components/common/UserPopover.vue'
 import { commentPageSections } from '@/utils/commentContext'
 
 const props = defineProps({
-  targetCommentId: { type: String, default: '' },
+  targetCommentId: {
+    type: String,
+    default: ''
+  },
   comment: {
     type: Object,
     required: true
@@ -239,7 +254,14 @@ const handleExpandReplies = (comment, pageNo) => {
   gap: 12px;
   padding: 10px 0;
 }
-.comment-item--target { border-radius: var(--radius-control); background: var(--color-canvas-sunken); outline: 1px solid var(--color-line-strong); outline-offset: 4px; scroll-margin-block: 24px; }
+.comment-item--target {
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  outline: 1px solid var(--color-line-strong);
+  outline-offset: 4px;
+  scroll-margin-block: 24px;
+}
+
 
 .comment-item--reply {
   padding: 6px 0;
@@ -476,8 +498,18 @@ const handleExpandReplies = (comment, pageNo) => {
 .comment-item__more:hover {
   color: var(--color-ink);
 }
-.comment-item__more:disabled { cursor: default; opacity: 0.6; }
-.comment-item__reply-error { margin-top: 8px; color: var(--color-ink-soft); font-size: 13px; line-height: 1.5; }
+.comment-item__more:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.comment-item__reply-error {
+  margin-top: 8px;
+  color: var(--color-ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 
 @keyframes like {
   0% {

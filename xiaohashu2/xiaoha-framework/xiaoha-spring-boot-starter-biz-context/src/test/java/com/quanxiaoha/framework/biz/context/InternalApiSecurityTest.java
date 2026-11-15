@@ -86,7 +86,7 @@ class InternalApiSecurityTest {
         assertThat(similarPath.headers()).doesNotContainKey(InternalApiAuthenticationFilter.TOKEN_HEADER);
         assertThatThrownBy(() -> new InternalApiRequestInterceptor("").apply(internal))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Internal API credential is not configured");
+                .hasMessage("内部接口服务凭证尚未配置");
     }
 
     @Test

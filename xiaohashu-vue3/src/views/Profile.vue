@@ -283,7 +283,12 @@ const handleClickOutside = (event) => {
 }
 
 const profileState = reactive(emptyProfileState())
-const profile = computed({ get: () => profileState.profile, set: value => { profileState.profile = value || {} } })
+const profile = computed({
+  get: () => profileState.profile,
+  set: value => {
+    profileState.profile = value || {}
+  }
+})
 const isOwnProfile = computed(() => profileUserId(route.params.userId) === undefined)
 const profileLoader = createProfileLoader(profileState, getUserProfile, userStore)
 const followStatus = ref(0)
@@ -688,7 +693,10 @@ const loadProfile = async () => {
   refreshFollowStatus(loaded.userId)
   loadNotes(true)
 }
-watch([() => route.params.userId, () => userStore.generation], loadProfile, { immediate: true, flush: 'sync' })
+watch([() => route.params.userId, () => userStore.generation], loadProfile, {
+  immediate: true,
+  flush: 'sync'
+})
 </script>
 
 <style scoped>
@@ -698,7 +706,12 @@ watch([() => route.params.userId, () => userStore.generation], loadProfile, { im
   flex-direction: column;
 }
 
-.profile-load-status { padding: 80px 24px; text-align: center; color: var(--color-ink-soft); }
+.profile-load-status {
+  padding: 80px 24px;
+  text-align: center;
+  color: var(--color-ink-soft);
+}
+
 
 /* 背景图层：圆角卡片铺满内容宽度（与下方笔记瀑布流左右对齐），
    绝对定位在资料头部区域，不参与交互 */

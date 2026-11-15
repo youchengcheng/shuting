@@ -6,7 +6,12 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 public interface NoteDOMapper {
+
+    /*
+     * 根据笔记 ID 集合批量查询笔记
+     * */
     List<NoteDO> selectByIds(@Param("ids") List<Long> ids);
+
     int deleteByPrimaryKey(Long id);
 
     int insert(NoteDO record);

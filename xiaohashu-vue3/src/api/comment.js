@@ -3,6 +3,7 @@ import axios from "@/axios";
 // 接口前缀
 const API_PREFIX = '/comment'
 
+// 获取相关评论上下文
 export function getCommentContext(noteId, commentId, options) {
     return axios.post(`${API_PREFIX}/context`, { noteId, commentId }, { silent: true, ...options })
 }

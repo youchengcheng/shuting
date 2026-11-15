@@ -1,5 +1,7 @@
 package com.quanxiaoha.xiaohashu.user.relation.biz.service;
 
+import com.quanxiaoha.xiaohashu.user.relation.biz.service.impl.FollowNotificationPersistenceServiceImpl;
+
 import com.quanxiaoha.xiaohashu.user.relation.biz.domain.dataobject.*;
 import com.quanxiaoha.xiaohashu.user.relation.biz.domain.mapper.*;
 import com.quanxiaoha.xiaohashu.user.relation.biz.model.dto.FollowUserMqDTO;
@@ -16,7 +18,7 @@ class FollowNotificationPersistenceTest {
     FollowingDOMapper following = mock(FollowingDOMapper.class);
     FansDOMapper fans = mock(FansDOMapper.class);
     NotificationOutboxWriter outbox = mock(NotificationOutboxWriter.class);
-    FollowNotificationPersistenceService service = new FollowNotificationPersistenceService();
+    FollowNotificationPersistenceService service = new FollowNotificationPersistenceServiceImpl();
     FollowUserMqDTO event = FollowUserMqDTO.builder().userId(1L).followingId(2L).createTime(LocalDateTime.of(2026,11,14,1,0)).build();
     @BeforeEach void setup() {
         TransactionTemplate tx = mock(TransactionTemplate.class);

@@ -15,11 +15,16 @@ import org.springframework.core.Ordered;
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class ContextAutoConfiguration {
 
+    /*
+    * 注册内部接口鉴权过滤器，在读取用户上下文前校验服务凭证
+    * */
     @Bean
     public FilterRegistrationBean<InternalApiAuthenticationFilter> internalApiAuthenticationFilter(
             @Value("${internal.api.token:${INTERNAL_API_TOKEN:}}") String token) {
+        // 创建并包装内部接口鉴权过滤器
         FilterRegistrationBean<InternalApiAuthenticationFilter> bean =
                 new FilterRegistrationBean<>(new InternalApiAuthenticationFilter(token));
+        // 内部接口鉴权优先执行
         bean.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return bean;
     }

@@ -17,6 +17,9 @@ public class FeignContextAutoConfiguration {
         return new FeignRequestInterceptor();
     }
 
+    /*
+    * 注册内部接口凭证拦截器
+    * */
     @Bean
     public InternalApiRequestInterceptor internalApiRequestInterceptor(
             @Value("${internal.api.token:${INTERNAL_API_TOKEN:}}") String token) {

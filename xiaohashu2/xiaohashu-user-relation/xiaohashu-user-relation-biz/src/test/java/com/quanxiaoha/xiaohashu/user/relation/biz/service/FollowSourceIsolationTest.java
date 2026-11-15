@@ -15,8 +15,8 @@ class FollowSourceIsolationTest {
         NotificationOutboxProperties props=new NotificationOutboxProperties(); props.getEvents().setEnabled(true);
         NotificationEventIsolationWriter isolation=mock(NotificationEventIsolationWriter.class);
         FollowNotificationPersistenceService persistence=mock(FollowNotificationPersistenceService.class);
-        ReflectionTestUtils.setField(consumer,"notificationProperties",props); ReflectionTestUtils.setField(consumer,"isolationWriter",isolation);
-        ReflectionTestUtils.setField(consumer,"followPersistenceService",persistence);
+        ReflectionTestUtils.setField(consumer,"notificationOutboxProperties",props); ReflectionTestUtils.setField(consumer,"notificationEventIsolationWriter",isolation);
+        ReflectionTestUtils.setField(consumer,"followNotificationPersistenceService",persistence);
         String payload=JsonUtils.toJsonString(FollowUserMqDTO.builder().userId(1L).followingId(2L).build());
         ReflectionTestUtils.invokeMethod(consumer,"handleFollowTagMessage",payload);
         verify(isolation).save(anyString(),eq(payload),anyString()); verifyNoInteractions(persistence);
@@ -27,7 +27,7 @@ class FollowSourceIsolationTest {
         FollowUnfollowConsumer consumer=new FollowUnfollowConsumer();
         NotificationOutboxProperties props=new NotificationOutboxProperties(); props.getEvents().setEnabled(true);
         NotificationEventIsolationWriter isolation=mock(NotificationEventIsolationWriter.class);
-        ReflectionTestUtils.setField(consumer,"notificationProperties",props); ReflectionTestUtils.setField(consumer,"isolationWriter",isolation);
+        ReflectionTestUtils.setField(consumer,"notificationOutboxProperties",props); ReflectionTestUtils.setField(consumer,"notificationEventIsolationWriter",isolation);
         for (String payload : java.util.List.of("{", "{\"userId\":1,\"followingId\":2,\"createTime\":\"invalid-time\"}")) {
             ReflectionTestUtils.invokeMethod(consumer,"handleFollowTagMessage",payload);
             verify(isolation).save(anyString(),eq(payload),anyString());

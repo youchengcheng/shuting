@@ -15,7 +15,9 @@ instance.interceptors.request.use(function (config) {
     // 从 localStorage 获取 token
     const userStore = useUserStore();
     config.session = config.session || userStore.captureSession();
-    if (!userStore.isCurrentSession(config.session)) return Promise.reject(Object.assign(new Error('Session changed'), { code: 'ERR_SESSION_STALE' }));
+    if (!userStore.isCurrentSession(config.session)) {
+        return Promise.reject(Object.assign(new Error('Session changed'), { code: 'ERR_SESSION_STALE' }));
+    }
     const token = config.session.token;
     
     // 如果存在 token，则添加到请求头
@@ -46,10 +48,14 @@ instance.interceptors.response.use(function (response) {
     if (error.config?.session && !userStore.isCurrentSession(error.config.session)) {
         return Promise.reject(Object.assign(new Error('Session changed'), { code: 'ERR_SESSION_STALE' }));
     }
-    if (error.code === 'ERR_CANCELED' || error.code === 'ERR_SESSION_STALE') return Promise.reject(error);
+    if (error.code === 'ERR_CANCELED' || error.code === 'ERR_SESSION_STALE') {
+        return Promise.reject(error);
+    }
 
     if (status === 401) {
-        if (userStore.logout(error.config?.session)) message.show('请先登录');
+        if (userStore.logout(error.config?.session)) {
+            message.show('请先登录');
+        }
     } else if (!error.config?.silent && (error.code === 'ECONNABORTED' || error.message?.includes('timeout'))) {
         // 请求超时（AI 接口较慢，已在 api/ai.js 里单独放宽超时时间）
         message.show('请求超时，请稍后重试');

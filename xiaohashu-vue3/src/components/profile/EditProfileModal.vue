@@ -466,7 +466,9 @@ const handleConfirm = async () => {
 
     // 资料更新成功后整页刷新，避免页面其他位置（头部、笔记列表等）仍展示旧的用户信息
     setTimeout(() => {
-      if (userStore.isCurrentSession(session)) window.location.reload()
+      if (userStore.isCurrentSession(session)) {
+        window.location.reload()
+      }
     }, PROFILE_REFRESH_DELAY)
 
   } catch (error) {

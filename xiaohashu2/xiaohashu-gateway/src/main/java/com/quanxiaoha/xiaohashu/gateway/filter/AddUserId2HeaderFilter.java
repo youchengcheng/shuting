@@ -33,16 +33,30 @@ public class AddUserId2HeaderFilter implements GlobalFilter, Ordered {
      * Token 前缀
      */
     private static final String TOKEN_HEADER_VALUE_PREFIX = "Bearer ";
+
+    /**
+     * 内部服务凭证请求头
+     */
     private static final String INTERNAL_TOKEN_HEADER_KEY = "X-Internal-Token";
 
+    /**
+     * 设置用户身份透传过滤器的执行顺序
+     */
     @Override
     public int getOrder() {
         return Ordered.HIGHEST_PRECEDENCE;
     }
 
+
+    /**
+     * 网关过滤器核心处理方法
+     * @param exchange 一次请求的上下文，封装了ServerHttpRequest、ServerHttpResponse及自定义属性
+     * @param chain 过滤器链，调用chain.filter(exchange)放行请求进入下一个过滤器/路由
+     * @return Mono<Void> 响应式结果流，代表请求处理完成
+     */
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        // 外部请求不能自行声明用户身份或内部服务凭证，所有分支均使用清理后的请求。
+        // 清除客户端传入的用户 ID 和内部服务凭证
         ServerWebExchange sanitizedExchange = exchange.mutate()
                 .request(builder -> builder.headers(headers -> {
                     headers.remove(GlobalConstants.USER_ID);
@@ -54,16 +68,17 @@ public class AddUserId2HeaderFilter implements GlobalFilter, Ordered {
         List<String> tokenList = exchange.getRequest().getHeaders().get(TOKEN_HEADER_KEY);
 
         if (tokenList == null || tokenList.size() != 1) {
-            // 若请求头中未携带 Token，则直接放行
+            // Token 缺失或存在多个值，继续传递清理后的请求
             return chain.filter(sanitizedExchange);
         }
 
         // 获取 Token 值
         String tokenValue = tokenList.get(0);
-        // 将 Token 前缀去除
+        // 校验 Token 前缀
         if (!tokenValue.startsWith(TOKEN_HEADER_VALUE_PREFIX)) {
             return chain.filter(sanitizedExchange);
         }
+        // 去除 Token 前缀，并校验内容格式
         String token = tokenValue.substring(TOKEN_HEADER_VALUE_PREFIX.length());
         if (token.isBlank() || token.chars().anyMatch(Character::isWhitespace)) {
             return chain.filter(sanitizedExchange);
@@ -86,7 +101,7 @@ public class AddUserId2HeaderFilter implements GlobalFilter, Ordered {
         } catch (NumberFormatException ex) {
             return chain.filter(sanitizedExchange);
         }
-        // Sa-Token 的过期、被顶替、被踢下线标记为负数，不是合法用户 ID。
+        // 过滤 Sa-Token 的过期、被顶替和被踢下线标记
         if (userId <= 0) {
             return chain.filter(sanitizedExchange);
         }

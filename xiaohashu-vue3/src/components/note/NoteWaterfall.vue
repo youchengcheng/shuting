@@ -12,12 +12,21 @@
     <template v-else>
       <div
         class="waterfall__grid"
-        :style="{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }"
+        :style="{ height: `${layout.height}px` }"
       >
-        <div v-for="(column, index) in columns" :key="index" class="waterfall__column">
+        <!-- 同一父节点下保持 ID key，重排时保留卡片状态和键盘阅读顺序 -->
+        <div
+          v-for="(note, index) in notes"
+          :key="noteKey(note)"
+          :ref="(element) => setItemRef(noteKey(note), element)"
+          class="waterfall__item"
+          :style="{
+            width: `${columnWidth}px`,
+            left: `${layout.positions[index].left}px`,
+            top: `${layout.positions[index].top}px`
+          }"
+        >
           <NoteCard
-            v-for="note in column"
-            :key="noteKey(note)"
             :note="note"
             :owner-actions="ownerActions"
             @click="$emit('note-click', note)"
@@ -48,10 +57,10 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import NoteCard from '@/components/note/NoteCard.vue'
 import NoteCardSkeleton from '@/components/note/NoteCardSkeleton.vue'
-import { splitIntoColumns, useWaterfallColumns } from '@/composables/useWaterfallColumns'
+import { createWaterfallLayout, useWaterfallColumns } from '@/composables/useWaterfallColumns'
 
 const props = defineProps({
   notes: {
@@ -93,7 +102,63 @@ const rootRef = ref(null)
 const sentinelRef = ref(null)
 let observer = null
 
-const { columnCount } = useWaterfallColumns(rootRef)
+const { columnCount, containerWidth } = useWaterfallColumns(rootRef)
+const columnGap = ref(16)
+const rowGap = 24
+const columnWidth = computed(() => Math.max(0,
+  (containerWidth.value - columnGap.value * (columnCount.value - 1)) / columnCount.value
+))
+const noteKey = (note) => note.id ?? note.noteId
+const itemRefs = new Map()
+const cardSizes = shallowRef(new Map())
+let resizeObserver = null
+let measureFrame = null
+
+// 图片尚未加载或列宽改变时先按 3:4 封面预估，真实尺寸到位后再校正。
+const layout = computed(() => createWaterfallLayout(
+  props.notes.map((note) => {
+    const size = cardSizes.value.get(noteKey(note))
+    return size && Math.abs(size.width - columnWidth.value) < 1
+      ? size.height
+      : columnWidth.value * 4 / 3 + 90
+  }),
+  columnCount.value,
+  columnWidth.value,
+  columnGap.value,
+  rowGap
+))
+
+// 一帧内批量读卡片尺寸，避免每张封面加载时反复触发布局读写。
+const scheduleMeasure = () => {
+  if (measureFrame !== null) return
+  measureFrame = requestAnimationFrame(() => {
+    measureFrame = null
+    const sizes = new Map()
+    itemRefs.forEach((element, key) => {
+      const { width, height } = element.getBoundingClientRect()
+      sizes.set(key, { width, height })
+    })
+    cardSizes.value = sizes
+  })
+}
+
+const setItemRef = (key, element) => {
+  const previous = itemRefs.get(key)
+  if (previous === element) return
+  if (previous) resizeObserver?.unobserve(previous)
+  if (element) {
+    itemRefs.set(key, element)
+    resizeObserver?.observe(element)
+  } else {
+    itemRefs.delete(key)
+  }
+}
+
+watch(
+  [() => props.notes, () => props.notes.length, columnWidth, () => props.loading],
+  () => nextTick(scheduleMeasure),
+  { flush: 'post' }
+)
 
 // 重新观察哨兵：IntersectionObserver 只在交叉状态变化时回调，
 // 每次数据追加后重新 observe 一次，才能连续加载到填满视口。
@@ -104,6 +169,10 @@ const rearm = () => {
 }
 
 onMounted(() => {
+  columnGap.value = parseFloat(getComputedStyle(rootRef.value).getPropertyValue('--grid-gap')) || 16
+  resizeObserver = new ResizeObserver(scheduleMeasure)
+  itemRefs.forEach((element) => resizeObserver.observe(element))
+  scheduleMeasure()
   observer = new IntersectionObserver(
     (entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return
@@ -116,21 +185,21 @@ onMounted(() => {
 })
 
 watch(
-  [sentinelRef, () => props.notes.length, () => props.hasMore, () => props.loading, () => props.loadingMore],
+  [sentinelRef, () => props.notes.length, () => props.hasMore, () => props.loading, () => props.loadingMore, () => layout.value.height],
   () => nextTick(rearm),
   { flush: 'post' }
 )
 
 onBeforeUnmount(() => {
   if (observer) observer.disconnect()
+  resizeObserver?.disconnect()
+  if (measureFrame !== null) cancelAnimationFrame(measureFrame)
 })
 
-const columns = computed(() => splitIntoColumns(props.notes, columnCount.value))
 const reachedEnd = computed(
   () => props.showBottomLine && !props.loading && !props.hasMore && props.notes.length > 0
 )
 
-const noteKey = (note) => note.id ?? note.noteId
 </script>
 
 <style scoped>
@@ -140,23 +209,28 @@ const noteKey = (note) => note.id ?? note.noteId
 
 .waterfall__grid,
 .waterfall__skeletons {
-  display: grid;
-  column-gap: var(--grid-gap);
-  row-gap: 24px;
   width: 100%;
   position: relative;
   z-index: 1;
+}
+
+.waterfall__skeletons {
+  display: grid;
+  column-gap: var(--grid-gap);
+  row-gap: 24px;
 }
 
 .waterfall__grid {
   animation: fadeIn var(--motion-base) var(--ease-standard);
 }
 
-.waterfall__column {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+.waterfall__item {
+  position: absolute;
   min-width: 0;
+}
+
+.waterfall__item:has(.note-card--menu-open) {
+  z-index: 5;
 }
 
 @keyframes fadeIn {

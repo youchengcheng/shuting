@@ -4,17 +4,21 @@ import com.quanxiaoha.framework.common.exception.BizException;
 import com.quanxiaoha.xiaohashu.comment.biz.domain.dataobject.CommentDO;
 import com.quanxiaoha.xiaohashu.comment.biz.domain.mapper.CommentDOMapper;
 import com.quanxiaoha.xiaohashu.comment.biz.rpc.*;
+import com.quanxiaoha.xiaohashu.comment.biz.service.impl.CommentInternalQueryServiceImpl;
+import com.quanxiaoha.xiaohashu.comment.biz.service.impl.CommentReplyValidatorImpl;
 import com.quanxiaoha.xiaohashu.comment.dto.*;
 import com.quanxiaoha.xiaohashu.note.dto.NoteMetadataDTO;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+
 import java.util.*;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class CommentAccessTest {
     @Test void replyTargetAndRootMustBelongToTheRequestedNote() {
-        CommentDOMapper mapper=mock(CommentDOMapper.class); CommentReplyValidator validator=new CommentReplyValidator();
+        CommentDOMapper mapper=mock(CommentDOMapper.class); CommentReplyValidator validator=new CommentReplyValidatorImpl();
         ReflectionTestUtils.setField(validator,"commentDOMapper",mapper);
         CommentDO target=CommentDO.builder().id(12L).noteId(1L).parentId(10L).level(2).build();
         when(mapper.selectByPrimaryKey(12L)).thenReturn(target);
@@ -24,7 +28,7 @@ class CommentAccessTest {
     }
     @Test void inaccessibleCommentsDoNotReadKvOrReturnBodyOrImage() {
         CommentDOMapper mapper=mock(CommentDOMapper.class); NoteAccessService access=mock(NoteAccessService.class);
-        KeyValueRpcService kv=mock(KeyValueRpcService.class); CommentInternalQueryService service=new CommentInternalQueryService();
+        KeyValueRpcService kv=mock(KeyValueRpcService.class); CommentInternalQueryService service=new CommentInternalQueryServiceImpl();
         ReflectionTestUtils.setField(service,"commentDOMapper",mapper); ReflectionTestUtils.setField(service,"noteAccessService",access);
         ReflectionTestUtils.setField(service,"keyValueRpcService",kv);
         when(mapper.selectByCommentIds(List.of(1L))).thenReturn(List.of(CommentDO.builder().id(1L).noteId(2L).userId(3L).isContentEmpty(false).contentUuid("body").imageUrl("private image").build()));

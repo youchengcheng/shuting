@@ -16,8 +16,14 @@ import java.time.LocalDateTime;
 @Builder
 public class LikeUnlikeCommentMqDTO {
 
+    /**
+     * 被点赞评论的发布者 ID
+     */
     private Long commentCreatorId;
 
+    /**
+     * 评论所属笔记 ID
+     */
     private Long noteId;
 
 

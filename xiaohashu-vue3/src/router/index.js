@@ -31,7 +31,12 @@ const router = createRouter({
           path: '/notifications',
           name: 'Notifications',
           component: () => import('@/views/Notifications.vue'),
-          children: [{ path: 'note/:noteId', name: 'NotificationNoteDetail', component: NoteDetailOverlay, props: true }]
+          children: [{
+            path: 'note/:noteId',
+            name: 'NotificationNoteDetail',
+            component: NoteDetailOverlay,
+            props: true
+          }]
         },
         {
           path: PROFILE_ROUTE_PATH,

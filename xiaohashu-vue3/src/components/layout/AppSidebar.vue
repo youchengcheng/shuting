@@ -67,7 +67,12 @@
       </button>
 
       <!-- 通知 -->
-      <router-link to="/notifications" class="nav-item" active-class="nav-item--active" :aria-label="notificationStore.summary.totalUnread ? `通知，${notificationStore.summary.totalUnread}条未读` : '通知'">
+      <router-link
+        to="/notifications"
+        class="nav-item"
+        active-class="nav-item--active"
+        :aria-label="notificationStore.summary.totalUnread ? `通知，${notificationStore.summary.totalUnread}条未读` : '通知'"
+      >
         <span class="nav-item__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none">
             <path
@@ -94,7 +99,13 @@
         <img class="nav-item__avatar" :src="profile.avatar || defaultAvatar" alt="" />
         <span class="nav-item__label">我</span>
       </router-link>
-      <button v-else type="button" class="nav-item" aria-label="登录后查看我的主页" @click="handleShowLogin">
+      <button
+        v-else
+        type="button"
+        class="nav-item"
+        aria-label="登录后查看我的主页"
+        @click="handleShowLogin"
+      >
         <span class="nav-item__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none">
             <path
@@ -202,7 +213,11 @@ const handlePublish = () => {
 </script>
 
 <style scoped>
-.nav-item:disabled { opacity: .65; cursor: wait; }
+.nav-item:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
 .sidebar {
   position: fixed;
   top: var(--header-h);

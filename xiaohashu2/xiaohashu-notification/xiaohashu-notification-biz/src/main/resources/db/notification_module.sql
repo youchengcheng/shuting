@@ -1,66 +1,67 @@
 -- Review artifact only. application.properties disables automatic SQL initialization.
 -- Notification DB: user_state, notification and event_error. Source DBs: outbox and event_error.
 -- If all services share one schema, apply the four statements once after review.
+-- Existing tables: apply notification_module_comments.sql to update database comments.
 CREATE TABLE IF NOT EXISTS t_notification_user_state (
-    recipient_id BIGINT NOT NULL,
-    last_seq BIGINT NOT NULL DEFAULT 0,
-    revision BIGINT NOT NULL DEFAULT 0,
-    like_collection_read_seq BIGINT NOT NULL DEFAULT 0,
-    comment_reply_read_seq BIGINT NOT NULL DEFAULT 0,
-    follow_read_seq BIGINT NOT NULL DEFAULT 0,
+    recipient_id BIGINT NOT NULL COMMENT '通知接收者用户 ID',
+    last_seq BIGINT NOT NULL DEFAULT 0 COMMENT '该用户最新通知序号，跨分类共享，初始为 0',
+    revision BIGINT NOT NULL DEFAULT 0 COMMENT '通知状态版本，新增通知或已读状态变化时递增',
+    like_collection_read_seq BIGINT NOT NULL DEFAULT 0 COMMENT '点赞收藏分类的全部已读水位，该分类 seq 不大于此值视为已读',
+    comment_reply_read_seq BIGINT NOT NULL DEFAULT 0 COMMENT '评论回复分类的全部已读水位，该分类 seq 不大于此值视为已读',
+    follow_read_seq BIGINT NOT NULL DEFAULT 0 COMMENT '关注分类的全部已读水位，该分类 seq 不大于此值视为已读',
     PRIMARY KEY (recipient_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户通知序号、状态版本和分类已读水位';
 
 CREATE TABLE IF NOT EXISTS t_notification (
-    id BIGINT NOT NULL AUTO_INCREMENT,
-    business_key VARCHAR(191) NOT NULL,
-    recipient_id BIGINT NOT NULL,
-    actor_id BIGINT NOT NULL,
-    type VARCHAR(24) NOT NULL,
-    category VARCHAR(32) NOT NULL,
-    recipient_role VARCHAR(24) NOT NULL,
-    note_id BIGINT NULL,
-    comment_id BIGINT NULL,
-    reply_comment_id BIGINT NULL,
-    occurred_at DATETIME NOT NULL,
-    seq BIGINT NOT NULL,
-    read_at DATETIME NULL,
-    created_at DATETIME NOT NULL,
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '通知记录自增主键',
+    business_key VARCHAR(191) NOT NULL COMMENT '互动业务键，格式为类型:操作用户ID:业务对象ID，与接收者共同去重',
+    recipient_id BIGINT NOT NULL COMMENT '通知接收者用户 ID',
+    actor_id BIGINT NOT NULL COMMENT '触发互动的操作用户 ID',
+    type VARCHAR(24) NOT NULL COMMENT '互动类型：NOTE_LIKE 笔记点赞，COMMENT_LIKE 评论点赞，NOTE_COLLECT 笔记收藏，COMMENT 评论，REPLY 回复，FOLLOW 关注',
+    category VARCHAR(32) NOT NULL COMMENT '通知分类：LIKE_COLLECTION 点赞收藏，COMMENT_REPLY 评论回复，FOLLOW 关注',
+    recipient_role VARCHAR(24) NOT NULL COMMENT '接收者角色：OWNER 笔记或评论作者，REPLY_TARGET 被回复用户，FOLLOW_TARGET 被关注用户',
+    note_id BIGINT NULL COMMENT '关联笔记 ID，关注通知为空',
+    comment_id BIGINT NULL COMMENT '关联评论 ID：评论或回复时为新发表记录，评论点赞时为被点赞评论，其他类型为空',
+    reply_comment_id BIGINT NULL COMMENT '被回复评论 ID，非回复通知为空',
+    occurred_at DATETIME NOT NULL COMMENT '原始互动发生时间，Asia/Shanghai 时区，精确到秒',
+    seq BIGINT NOT NULL COMMENT '接收者内递增的通知序号，跨分类共享，用于排序、快照分页和已读水位',
+    read_at DATETIME NULL COMMENT '单条标记已读时间，为空时仍需结合分类已读水位判断',
+    created_at DATETIME NOT NULL COMMENT '通知记录入库时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_notification_business_recipient (business_key,recipient_id),
     UNIQUE KEY uk_notification_recipient_seq (recipient_id,seq),
     KEY idx_notification_category_seq (recipient_id,category,seq),
     KEY idx_notification_unread (recipient_id,category,read_at,seq)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户互动通知记录';
 
 CREATE TABLE IF NOT EXISTS t_notification_outbox (
-    id BIGINT NOT NULL AUTO_INCREMENT,
-    producer_service VARCHAR(64) NOT NULL,
-    business_key VARCHAR(191) NOT NULL,
-    event_id CHAR(36) NOT NULL,
-    payload LONGTEXT NOT NULL,
-    state VARCHAR(16) NOT NULL DEFAULT 'PENDING',
-    next_attempt_at DATETIME NOT NULL,
-    attempts INT NOT NULL DEFAULT 0,
-    lease_owner VARCHAR(64) NULL,
-    lease_version BIGINT NOT NULL DEFAULT 0,
-    lease_until DATETIME NULL,
-    last_error VARCHAR(1000) NULL,
-    created_at DATETIME NOT NULL,
-    sent_at DATETIME NULL,
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '发件箱记录自增主键',
+    producer_service VARCHAR(64) NOT NULL COMMENT '来源业务服务名称，对应 spring.application.name',
+    business_key VARCHAR(191) NOT NULL COMMENT '互动业务键，格式为类型:操作用户ID:业务对象ID，与来源服务共同去重并保留首次事件',
+    event_id CHAR(36) NOT NULL COMMENT '通知事件唯一 ID，未提供时生成 UUID，首次入库后重投保持不变',
+    payload LONGTEXT NOT NULL COMMENT '待投递的通知事件完整 JSON 内容',
+    state VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT '投递状态：PENDING 待发送，SENDING 发送中，SENT 已发送',
+    next_attempt_at DATETIME NOT NULL COMMENT '待发送记录下次允许尝试投递的时间',
+    attempts INT NOT NULL DEFAULT 0 COMMENT '累计领取发送次数，包含首次领取和租约过期后的重新领取',
+    lease_owner VARCHAR(64) NULL COMMENT '当前领取事件的投递实例 UUID，无租约时为空',
+    lease_version BIGINT NOT NULL DEFAULT 0 COMMENT '每次领取时递增的租约版本，防止旧任务覆盖当前状态',
+    lease_until DATETIME NULL COMMENT '当前发送租约到期时间，到期后允许重新领取',
+    last_error VARCHAR(1000) NULL COMMENT '最近一次发送失败原因，发送成功后清空',
+    created_at DATETIME NOT NULL COMMENT '事件写入来源业务数据库的时间',
+    sent_at DATETIME NULL COMMENT '消息获得 MQ 成功确认后标记已发送的时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_notification_outbox_business (producer_service,business_key),
     UNIQUE KEY uk_notification_outbox_event (event_id),
     KEY idx_notification_outbox_scan (producer_service,state,next_attempt_at,lease_until,id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='来源业务事务内的通知事件发件箱';
 
 CREATE TABLE IF NOT EXISTS t_notification_event_error (
-    id BIGINT NOT NULL AUTO_INCREMENT,
-    source VARCHAR(64) NOT NULL,
-    event_identity VARCHAR(64) NOT NULL,
-    payload LONGTEXT NOT NULL,
-    reason VARCHAR(1000) NOT NULL,
-    created_at DATETIME NOT NULL,
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '异常事件记录自增主键',
+    source VARCHAR(64) NOT NULL COMMENT '事件来源：通知消费者为消息主题，来源业务服务为服务名:消息主题',
+    event_identity VARCHAR(64) NOT NULL COMMENT '来源、换行符和原始消息的 SHA-256 十六进制摘要，用于同来源消息去重',
+    payload LONGTEXT NOT NULL COMMENT '无法处理的原始消息内容',
+    reason VARCHAR(1000) NOT NULL COMMENT '事件无法处理的原因，如参数校验失败或回复目标不存在',
+    created_at DATETIME NOT NULL COMMENT '异常事件隔离入库时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_notification_error (source,event_identity)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='无法处理的通知事件隔离记录';

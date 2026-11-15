@@ -26,10 +26,10 @@ class CollectSourceNotificationTest {
         when(tx.execute(any())).thenAnswer(call -> ((TransactionCallback<?>)call.getArgument(0)).doInTransaction(new SimpleTransactionStatus()));
         NotificationOutboxProperties props=new NotificationOutboxProperties(); props.getEvents().setEnabled(true);
         props.setEnabledAt(LocalDateTime.of(2026,11,14,0,0));
-        ReflectionTestUtils.setField(consumer,"transactionTemplate",tx); ReflectionTestUtils.setField(consumer,"notificationProperties",props);
+        ReflectionTestUtils.setField(consumer,"transactionTemplate",tx); ReflectionTestUtils.setField(consumer,"notificationOutboxProperties",props);
         ReflectionTestUtils.setField(consumer,"noteCollectionDOMapper",mapper); ReflectionTestUtils.setField(consumer,"notificationOutboxWriter",outbox);
         ReflectionTestUtils.setField(consumer,"rocketMQTemplate",mq);
-        ReflectionTestUtils.setField(consumer,"isolationWriter",isolation);
+        ReflectionTestUtils.setField(consumer,"notificationEventIsolationWriter",isolation);
         body=JsonUtils.toJsonString(CollectUnCollectNoteMqDTO.builder().userId(1L).noteId(2L).noteCreatorId(3L).type(1).createTime(LocalDateTime.of(2026,11,14,1,0)).build());
     }
     @Test void malformedJsonAndTimeAreIsolatedBeforeAck() {

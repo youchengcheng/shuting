@@ -1,7 +1,17 @@
 <template>
   <div class="tab-nav">
-    <div ref="tabList" class="tab-list" :class="{ 'tab-list--animated': animate && indicator.width }" role="tablist">
-      <span v-if="animate && indicator.width" class="tab-indicator" :style="indicatorStyle" aria-hidden="true"></span>
+    <div
+      ref="tabList"
+      class="tab-list"
+      :class="{ 'tab-list--animated': animate && indicator.width }"
+      role="tablist"
+    >
+      <span
+        v-if="animate && indicator.width"
+        class="tab-indicator"
+        :style="indicatorStyle"
+        aria-hidden="true"
+      ></span>
       <button
         v-for="tab in tabs"
         :key="tab.key"
@@ -73,10 +83,18 @@ const updateIndicator = () => {
   if (!props.animate) return
   const selected = tabList.value?.querySelector('.tab-item.active')
   indicator.value = selected
-    ? { left: selected.offsetLeft, top: selected.offsetTop, width: selected.offsetWidth, height: selected.offsetHeight }
+    ? {
+      left: selected.offsetLeft,
+      top: selected.offsetTop,
+      width: selected.offsetWidth,
+      height: selected.offsetHeight
+    }
     : { left: 0, top: 0, width: 0, height: 0 }
 }
-watch(() => [props.modelValue, props.tabs, props.animate], updateIndicator, { deep: true, flush: 'post' })
+watch(() => [props.modelValue, props.tabs, props.animate], updateIndicator, {
+  deep: true,
+  flush: 'post'
+})
 onMounted(() => {
   updateIndicator()
   if (!props.animate) return
@@ -155,8 +173,20 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   width: 18px;
   height: 18px;
 }
-.tab-count { min-width: 18px; padding: 1px 5px; border-radius: var(--radius-pill); color: var(--color-brand-hover); background: var(--color-paper); font-size: 12px; line-height: 1.4; }
+.tab-count {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  color: var(--color-brand-hover);
+  background: var(--color-paper);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .tab-indicator { transition: none; }
+  .tab-indicator {
+    transition: none;
+  }
+
 }
 </style>

@@ -128,7 +128,7 @@ HTTP 状态：参数错误 400、登录无效 401、本人记录不存在 404、
 
 本节供之后落实时使用，本次代码交付没有执行这些步骤。
 
-1. 确认数据库边界：通知库需要 `t_notification_user_state`、`t_notification`、`t_notification_event_error`；每个源库需要本地 `t_notification_outbox` 和源坏事件隔离表。如当前共享数据库，仅创建一次。SQL 位于 `xiaohashu-notification-biz/src/main/resources/db/notification_module.sql`，没有自动迁移。
+1. 确认数据库边界：通知库需要 `t_notification_user_state`、`t_notification`、`t_notification_event_error`；每个源库需要本地 `t_notification_outbox` 和源坏事件隔离表。如当前共享数据库，仅创建一次。SQL 位于 `xiaohashu-notification-biz/src/main/resources/db/notification_module.sql`，没有自动迁移。`CREATE TABLE IF NOT EXISTS` 不会更新已有表的注释；已有表可执行 `xiaohashu-notification-biz/src/main/resources/db/notification_module_comments.sql`，为四张表补齐字段注释和表注释。
 2. 各服务配置同一个 `INTERNAL_API_TOKEN`，通过安全环境变量注入。网关删除外部同名头，Feign 只对 `/internal/` 添加令牌。内部查询直连缺少配置返回 503，错误/重复令牌返回 401。
 3. 配置 DB、Redis、Nacos、RocketMQ；通知服务环境变量见 `application.properties`，不含生产密码。通知默认采用现有 Nacos namespace `xiaohashu`、group `DEFAULT_GROUP`；`NACOS_NAMESPACE`/`NACOS_GROUP` 覆盖时需与网关和源服务同步。源服务端口仅内网可访问，公开业务请求通过网关；内部共享令牌不能替代源服务端口的网络隔离。网关代理需允许 SSE、关闭缓冲，并使用大于心跳间隔的流空闲超时。
 4. 先部署仍关闭的源服务及通知服务版本，确保所有实例都能补全评论赞字段。

@@ -14,7 +14,12 @@
     <div>
       <template v-for="section in sections" :key="section.pageNo">
         <div v-if="section.firstMissingPage" class="comment-list__gap">
-          <button type="button" class="st-btn st-btn-ghost" :disabled="loadingMore" @click="$emit('load-page', section.firstMissingPage)">{{ loadingMore ? '正在加载…' : '查看更多评论' }}</button>
+          <button
+            type="button"
+            class="st-btn st-btn-ghost"
+            :disabled="loadingMore"
+            @click="$emit('load-page', section.firstMissingPage)"
+          >{{ loadingMore ? '正在加载…' : '查看更多评论' }}</button>
         </div>
         <CommentItem
           v-for="comment in section.comments"
@@ -42,7 +47,13 @@
 
     <!-- 到底了提示 -->
     <div v-if="comments && comments.length > 0" class="comment-list__end">
-      <button v-if="hasMore" type="button" class="st-btn st-btn-ghost" :disabled="loadingMore" @click="$emit('load-more')">{{ loadingMore ? '正在加载…' : '加载更多评论' }}</button>
+      <button
+        v-if="hasMore"
+        type="button"
+        class="st-btn st-btn-ghost"
+        :disabled="loadingMore"
+        @click="$emit('load-more')"
+      >{{ loadingMore ? '正在加载…' : '加载更多评论' }}</button>
       <span v-else>到底了</span>
     </div>
   </div>
@@ -55,14 +66,29 @@ import CommentItem from './CommentItem.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 
 const props = defineProps({
-  paging: { type: Object, default: null },
-  targetCommentId: { type: String, default: '' },
+  paging: {
+    type: Object,
+    default: null
+  },
+  targetCommentId: {
+    type: String,
+    default: ''
+  },
   loading: Boolean,
   loadingMore: Boolean,
   locating: Boolean,
-  locationError: { type: String, default: '' },
-  error: { type: String, default: '' },
-  unavailableReason: { type: String, default: '' },
+  locationError: {
+    type: String,
+    default: ''
+  },
+  error: {
+    type: String,
+    default: ''
+  },
+  unavailableReason: {
+    type: String,
+    default: ''
+  },
   comments: {
     type: Array,
     default: () => []
@@ -116,8 +142,18 @@ const onClickComment = () => {
   /* 与笔记正文左右对齐：评论列表整块缩进 24px */
   padding: 16px 24px;
 }
-.comment-list__status { font-size: 14px; line-height: 1.6; color: var(--color-ink-soft); }
-.comment-list__gap { display: flex; justify-content: center; margin: 12px 0; }
+.comment-list__status {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-ink-soft);
+}
+
+.comment-list__gap {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+}
+
 
 .comment-list__count {
   margin-bottom: 12px;

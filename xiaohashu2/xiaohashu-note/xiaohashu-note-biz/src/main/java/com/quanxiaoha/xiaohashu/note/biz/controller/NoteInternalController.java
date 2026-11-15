@@ -5,14 +5,32 @@ import com.quanxiaoha.xiaohashu.note.biz.service.NoteInternalQueryService;
 import com.quanxiaoha.xiaohashu.note.dto.*;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
+/*
+ * 笔记内部查询接口
+ * */
 @RestController
 @RequestMapping("/internal/note")
 public class NoteInternalController {
-    @Resource private NoteInternalQueryService queries;
+
+    @Resource
+    private NoteInternalQueryService noteInternalQueryService;
+
+    /*
+     * 批量查询元数据
+     * */
     @PostMapping("/metadata")
-    public Response<List<NoteMetadataDTO>> metadata(@RequestBody NoteBatchQueryReqDTO request) { return Response.success(queries.metadata(request)); }
+    public Response<List<NoteMetadataDTO>> metadata(@RequestBody NoteBatchQueryReqDTO noteBatchQueryReqDTO) {
+        return Response.success(noteInternalQueryService.metadata(noteBatchQueryReqDTO));
+    }
+
+    /*
+     * 批量查询预览信息
+     * */
     @PostMapping("/previews")
-    public Response<List<NotePreviewDTO>> previews(@RequestBody NoteBatchQueryReqDTO request) { return Response.success(queries.previews(request)); }
+    public Response<List<NotePreviewDTO>> previews(@RequestBody NoteBatchQueryReqDTO noteBatchQueryReqDTO) {
+        return Response.success(noteInternalQueryService.previews(noteBatchQueryReqDTO));
+    }
 }

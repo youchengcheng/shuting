@@ -1,36 +1,61 @@
+// 解析分段到达的 SSE 事件
 export function createSseParser(onEvent) {
   let buffer = ''
   let event = ''
   let data = []
   let first = true
+
+  // 处理单行事件字段，空行表示一条事件结束
   const line = (value) => {
     if (!value) {
-      if (data.length) onEvent({ event: event || 'message', data: data.join('\n') })
+      if (data.length) {
+        onEvent({
+          event: event || 'message',
+          data: data.join('\n')
+        })
+      }
       event = ''
       data = []
       return
     }
-    if (value[0] === ':') return
+    if (value[0] === ':') {
+      return
+    }
     const separator = value.indexOf(':')
     const name = separator < 0 ? value : value.slice(0, separator)
     let content = separator < 0 ? '' : value.slice(separator + 1)
-    if (content.startsWith(' ')) content = content.slice(1)
-    if (name === 'event') event = content
-    if (name === 'data') data.push(content)
+    if (content.startsWith(' ')) {
+      content = content.slice(1)
+    }
+    if (name === 'event') {
+      event = content
+    }
+    if (name === 'data') {
+      data.push(content)
+    }
   }
   return (chunk) => {
-    if (first && chunk) { chunk = chunk.replace(/^\uFEFF/, ''); first = false }
+    if (first && chunk) {
+      chunk = chunk.replace(/^\uFEFF/, '')
+      first = false
+    }
     buffer += chunk
     let index = 0
     while (index < buffer.length) {
       const end = buffer.slice(index).search(/[\r\n]/)
-      if (end < 0) break
+      if (end < 0) {
+        break
+      }
       const at = index + end
-      if (buffer[at] === '\r' && at + 1 === buffer.length) break
+      if (buffer[at] === '\r' && at + 1 === buffer.length) {
+        break
+      }
       line(buffer.slice(index, at))
       index = at + (buffer[at] === '\r' && buffer[at + 1] === '\n' ? 2 : 1)
     }
     buffer = buffer.slice(index)
-    if (buffer.length > 1024 * 1024) throw new Error('SSE frame is too large')
+    if (buffer.length > 1024 * 1024) {
+      throw new Error('SSE frame is too large')
+    }
   }
 }

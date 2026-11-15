@@ -8,7 +8,12 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 public interface CommentDOMapper {
+
+    /*
+     * 插入新评论，评论 ID 已存在时保留原记录
+     * */
     int insertNew(CommentBO comment);
+
     int deleteByPrimaryKey(Long id);
 
     int insert(CommentDO record);
@@ -55,9 +60,15 @@ public interface CommentDOMapper {
                                    @Param("offset") long offset,
                                    @Param("pageSize") long pageSize);
 
+    /*
+     * 查询一级评论在笔记评论列表中的位置
+     * */
     Long selectRootCommentPosition(@Param("noteId") Long noteId,
                                    @Param("commentId") Long commentId);
 
+    /*
+     * 查询回复评论在一级评论回复列表中的位置
+     * */
     Long selectChildCommentPosition(@Param("parentId") Long parentId,
                                     @Param("commentId") Long commentId);
 

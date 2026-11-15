@@ -1,92 +1,112 @@
 package com.quanxiaoha.xiaohashu.notification.biz.controller;
 
-import com.quanxiaoha.framework.biz.context.holder.LoginUserContextHolder;
+import com.quanxiaoha.framework.common.exception.BizException;
 import com.quanxiaoha.framework.common.response.Response;
-import com.quanxiaoha.xiaohashu.notification.biz.config.NotificationSettings;
-import com.quanxiaoha.xiaohashu.notification.biz.model.NotificationResponses.*;
+import com.quanxiaoha.xiaohashu.notification.biz.enums.ResponseCodeEnum;
+import com.quanxiaoha.xiaohashu.notification.biz.util.NotificationAuthUtils;
+import com.quanxiaoha.xiaohashu.notification.biz.model.dto.NotificationSessionDTO;
+import com.quanxiaoha.xiaohashu.notification.biz.model.vo.*;
 import com.quanxiaoha.xiaohashu.notification.biz.service.*;
+
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import java.util.Collections;
-import java.util.List;
 
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.MediaType;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+/*
+ * 通知
+ * */
 @RestController
 @RequestMapping("/notification")
 public class NotificationController {
-    private final NotificationService service;
-    private final NotificationTokenValidator tokens;
-    private final NotificationSettings settings;
-    private final ObjectProvider<NotificationStreamHub> streams;
 
-    public NotificationController(NotificationService service, NotificationTokenValidator tokens,
-                                  NotificationSettings settings, ObjectProvider<NotificationStreamHub> streams) {
-        this.service = service;
-        this.tokens = tokens;
-        this.settings = settings;
-        this.streams = streams;
-    }
+    @Resource
+    private NotificationService notificationService;
 
+    @Resource
+    private NotificationAuthUtils notificationAuthUtils;
+
+    @Resource
+    private ObjectProvider<NotificationStreamHub> notificationStreams;
+
+    /*
+     * 通知列表分页查询
+     * */
     @PostMapping("/list")
-    public Response<Page> list(@RequestBody ListRequest body, HttpServletRequest request) {
-        Session session = authenticate(request);
-        return Response.success(service.list(session.userId, body.category(), body.cursor(), body.snapshotSeq(), body.pageSize()));
+    public Response<FindNotificationPageRspVO> list(@Validated @RequestBody FindNotificationPageListReqVO findNotificationPageListReqVO,
+                                                  HttpServletRequest request) {
+        // 从统一登录工具取得当前用户，接口不接受客户端指定通知接收者
+        NotificationSessionDTO notificationSessionDTO = notificationAuthUtils.authenticate(request);
+        return Response.success(notificationService.list(notificationSessionDTO.getUserId(),
+                findNotificationPageListReqVO.getCategory(), findNotificationPageListReqVO.getCursor(),
+                findNotificationPageListReqVO.getSnapshotSeq(), findNotificationPageListReqVO.getPageSize()));
     }
 
+    /*
+     * 查询通知未读数量
+     * */
     @GetMapping("/summary")
-    public Response<Summary> summary(HttpServletRequest request) {
-        return Response.success(service.summary(authenticate(request).userId));
+    public Response<FindNotificationSummaryRspVO> summary(HttpServletRequest request) {
+        // 摘要只查询当前登录用户的未读数量和版本
+        return Response.success(notificationService.summary(notificationAuthUtils.authenticate(request).getUserId()));
     }
 
+    /*
+     * 将单条通知标为已读
+     * */
     @PostMapping("/read")
-    public Response<ReadResult> read(@RequestBody ReadRequest body, HttpServletRequest request) {
-        return Response.success(service.markRead(authenticate(request).userId, body.notificationId()));
+    public Response<ReadNotificationRspVO> read(@Validated @RequestBody ReadNotificationReqVO readNotificationReqVO,
+                                               HttpServletRequest request) {
+        // 服务端校验通知归属后更新已读状态
+        return Response.success(notificationService.markRead(notificationAuthUtils.authenticate(request).getUserId(),
+                readNotificationReqVO.getNotificationId()));
     }
 
+    /*
+     * 将快照内的分类通知全部标为已读
+     * */
     @PostMapping("/read-all")
-    public Response<ReadAllResult> readAll(@RequestBody ReadAllRequest body, HttpServletRequest request) {
-        return Response.success(service.markAllRead(authenticate(request).userId, body.category(), body.snapshotSeq()));
+    public Response<ReadAllNotificationRspVO> readAll(@Validated @RequestBody ReadAllNotificationReqVO readAllNotificationReqVO,
+                                                     HttpServletRequest request) {
+        // 传递客户端已加载的快照，避免将刚到达的新通知一并标为已读
+        return Response.success(notificationService.markAllRead(notificationAuthUtils.authenticate(request).getUserId(),
+                readAllNotificationReqVO.getCategory(), readAllNotificationReqVO.getSnapshotSeq()));
     }
 
+    /*
+     * 批量查询通知已读状态
+     * */
     @PostMapping("/read-state")
-    public Response<ReadState> readState(@RequestBody ReadStateRequest body, HttpServletRequest request) {
-        return Response.success(service.readState(authenticate(request).userId, body.notificationIds()));
+    public Response<FindNotificationReadStateRspVO> readState(@Validated @RequestBody FindNotificationReadStateReqVO findNotificationReadStateReqVO,
+                                                             HttpServletRequest request) {
+        // 按当前用户过滤批量 ID，不能读取其他账号的通知状态
+        return Response.success(notificationService.readState(notificationAuthUtils.authenticate(request).getUserId(),
+                findNotificationReadStateReqVO.getNotificationIds()));
     }
 
+    /*
+     * 建立通知实时推送连接
+     * */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(HttpServletRequest request, HttpServletResponse response) {
-        Session session = authenticate(request);
-        NotificationStreamHub hub = streams.getIfAvailable();
-        if (hub == null) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "通知服务尚未启用");
-        SseEmitter emitter = hub.connect(session.userId, session.token);
+        // 从统一登录工具取得当前用户，接口不接受客户端指定通知接收者
+        NotificationSessionDTO notificationSessionDTO = notificationAuthUtils.authenticate(request);
+        // 未启用时不会创建 SSE 组件，通过 ObjectProvider 获取可选实现
+        NotificationStreamHub notificationStreamHub = notificationStreams.getIfAvailable();
+        if (notificationStreamHub == null) {
+            throw new BizException(ResponseCodeEnum.SERVICE_NOT_ENABLED);
+        }
+
+        SseEmitter sseEmitter = notificationStreamHub.connect(notificationSessionDTO.getUserId(), notificationSessionDTO.getToken());
+        // 禁止代理缓存和缓冲，使变化提示及时到达客户端
         response.setHeader("Cache-Control", "no-cache, no-store");
         response.setHeader("X-Accel-Buffering", "no");
-        return emitter;
+        return sseEmitter;
     }
 
-    private Session authenticate(HttpServletRequest request) {
-        List<String> headers = Collections.list(request.getHeaders("Authorization"));
-        Long userId = LoginUserContextHolder.getUserId();
-        if (userId == null || userId <= 0 || headers.size() != 1) throw loginRequired();
-        String header = headers.get(0);
-        if (!header.startsWith("Bearer ")) throw loginRequired();
-        String token = header.substring(7);
-        if (token.isBlank() || token.chars().anyMatch(ch -> Character.isWhitespace(ch) || ch == ',')) throw loginRequired();
-        // The gateway identity alone is insufficient if this service port is called directly.
-        tokens.require(token, userId);
-        if (!settings.isEnabled()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "通知服务尚未启用");
-        return new Session(userId, token);
-    }
-
-    private static ResponseStatusException loginRequired() { return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "请先登录"); }
-    private record Session(long userId, String token) { }
-    public record ListRequest(String category, String cursor, String snapshotSeq, Integer pageSize) { }
-    public record ReadRequest(String notificationId) { }
-    public record ReadAllRequest(String category, String snapshotSeq) { }
-    public record ReadStateRequest(List<String> notificationIds) { }
 }
