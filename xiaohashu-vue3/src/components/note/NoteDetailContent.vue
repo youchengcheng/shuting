@@ -329,7 +329,7 @@ import { ref, computed, nextTick, watch, onBeforeUnmount, inject, onMounted } fr
 import gsap from 'gsap'
 import CommentList from './CommentList.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { captureCommentSubmission, createCommentPageState, normalizeComment, mergeCommentPage, flattenCommentPages, nextMissingCommentPage, createCommentTargetNavigator, createCommentScrollAnchor, scrollCommentIntoContainer } from '@/utils/commentContext'
+import { captureCommentSubmission, createCommentPageState, normalizeComment, updateCommentLike, mergeCommentPage, flattenCommentPages, nextMissingCommentPage, createCommentTargetNavigator, createCommentScrollAnchor, scrollCommentIntoContainer } from '@/utils/commentContext'
 import ImageCarousel from '@/components/common/ImageCarousel.vue'
 import VideoPlayer from '@/components/common/VideoPlayer.vue'
 import { getNoteDetail, likeNote, unlikeNote, collectNote, uncollectNote, isLikedAndCollectedData } from '@/api/note' // 获取笔记详情的API
@@ -1077,46 +1077,22 @@ const confirmDeleteComment = () => {
   })
 }
 
-// 添加评论点赞处理函数
-const handleCommentLike = ({ comment, liked }) => {
+// 评论点赞和取消共用状态更新，失败时回滚并提示
+const handleCommentLike = async ({ comment, liked }) => {
   if (!isLoggedIn.value) {
     showLoginModal.value = true
     return
   }
   if (comment.likeLoading) return
   const owner = captureOwner()
-  comment.likeLoading = true
-
-
-  if (liked) {
-    likeComment(comment.commentId).then(res => {
-    if (!ownsComments(owner)) return
-    if (res.success) {
-      // 直接更新传入的 comment 对象的点赞数
-      comment.likeTotal++
-      comment.liked = true
-      } else {
-        message.show(res.message)
-      }
-    }).catch(() => {}).finally(() => {
-      if (ownsComments(owner)) {
-        comment.likeLoading = false
-      }
-    })
-    return
-  }
-  
-  unlikeComment(comment.commentId).then(res => {
-    if (!ownsComments(owner)) return
-    if (res.success) {
-      comment.likeTotal = Math.max(0, Number(comment.likeTotal || 0) - 1)
-      comment.liked = false
-    }
-  }).catch(() => {}).finally(() => {
+  const request = liked ? likeComment : unlikeComment
+  try {
+    await updateCommentLike(comment, liked, commentId => request(commentId, { session: owner.session }), () => ownsComments(owner))
+  } catch (error) {
     if (ownsComments(owner)) {
-      comment.likeLoading = false
+      message.show(error.message || (liked ? '点赞失败，请重试' : '取消点赞失败，请重试'))
     }
-  })
+  }
 }
 
 // 添加收藏状态

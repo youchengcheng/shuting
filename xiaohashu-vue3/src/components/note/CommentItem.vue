@@ -62,7 +62,16 @@
       <!-- 评论底部操作区 -->
       <div class="comment-item__actions">
         <!-- 点赞 -->
-        <button type="button" class="comment-action" :class="{ 'comment-action--liked': isLiked }" @click="toggleLike">
+        <button
+          type="button"
+          class="comment-action"
+          :class="{ 'comment-action--liked': isLiked }"
+          :disabled="comment.likeLoading"
+          :aria-pressed="isLiked"
+          :aria-busy="!!comment.likeLoading"
+          :aria-label="isLiked ? '取消点赞评论' : '点赞评论'"
+          @click="toggleLike"
+        >
           <svg
             class="comment-action__icon"
             :class="isLiked ? 'animate-like' : 'animate-unlike'"
@@ -233,6 +242,7 @@ onBeforeUnmount(() => {
 
 // 修改点赞切换函数
 const toggleLike = () => {
+  if (props.comment.likeLoading) return
   // 触发点赞事件，传递整个 comment 对象和点赞状态
   emit('like', { comment: props.comment, liked: !isLiked.value })
 }
@@ -367,6 +377,10 @@ const handleExpandReplies = (comment, pageNo) => {
 
 .comment-action:hover {
   color: var(--color-ink);
+}
+
+.comment-action:disabled {
+  cursor: wait;
 }
 
 .comment-action--liked,

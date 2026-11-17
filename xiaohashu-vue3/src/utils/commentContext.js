@@ -51,7 +51,8 @@ export function normalizeComment(comment) {
   const normalized = {
     ...comment,
     commentId: String(comment.commentId),
-    liked: !!comment.liked
+    liked: !!(comment.isLiked ?? comment.liked),
+    likeTotal: Math.max(0, Number(comment.likeTotal) || 0)
   }
   for (const key of ['noteId', 'userId', 'parentId', 'replyCommentId', 'replyUserId']) {
     if (comment[key] !== null && comment[key] !== undefined) {
@@ -59,6 +60,30 @@ export function normalizeComment(comment) {
     }
   }
   return normalized
+}
+
+// 点赞立即反馈，请求失败时恢复原状态；同一评论请求期间禁止重复提交
+export async function updateCommentLike(comment, liked, request, isCurrent = () => true) {
+  if (comment.likeLoading || comment.liked === liked) return
+  const previousLiked = !!comment.liked
+  const previousTotal = Math.max(0, Number(comment.likeTotal) || 0)
+  comment.likeLoading = true
+  comment.liked = liked
+  comment.likeTotal = Math.max(0, previousTotal + (liked ? 1 : -1))
+  try {
+    const response = await request(comment.commentId)
+    if (!response.success) {
+      throw new Error(response.message || (liked ? '点赞失败，请重试' : '取消点赞失败，请重试'))
+    }
+  } catch (error) {
+    if (isCurrent()) {
+      comment.liked = previousLiked
+      comment.likeTotal = previousTotal
+    }
+    throw error
+  } finally {
+    comment.likeLoading = false
+  }
 }
 
 // 合并评论分页数据，保留已加载评论的对象
@@ -74,6 +99,10 @@ export function mergeCommentPage(paging, response, mapItem = normalizeComment) {
   paging.pages[pageNo] = (response.data || []).map(item => {
     const previous = existing.get(String(item.commentId))
     const next = mapItem(item, previous)
+    if (previous?.likeLoading) {
+      next.liked = previous.liked
+      next.likeTotal = previous.likeTotal
+    }
     return previous ? Object.assign(previous, next) : next
   })
   paging.totalPages = Math.max(0, Number(response.totalPage) || 0)

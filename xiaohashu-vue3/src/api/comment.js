@@ -26,13 +26,13 @@ export function getChildCommentList(parentCommentId, pageNo, options) {
 }
 
 // 点赞评论
-export function likeComment(commentId) {
-    return axios.post(`${API_PREFIX}/like`, {commentId})
+export function likeComment(commentId, options) {
+    return axios.post(`${API_PREFIX}/like`, {commentId}, { silent: true, ...options })
 }
 
 // 取消点赞评论
-export function unlikeComment(commentId) {
-    return axios.post(`${API_PREFIX}/unlike`, {commentId})
+export function unlikeComment(commentId, options) {
+    return axios.post(`${API_PREFIX}/unlike`, {commentId}, { silent: true, ...options })
 }
 
 // 删除评论

@@ -15,6 +15,46 @@
 !xiaohashu-vue3/
 !xiaohashu-vue3/**
 
+# XXL-JOB：保留 Maven 模块源码、资源和构建配置
+!/xxl-job-3.4.0/
+!/xxl-job-3.4.0/**
+
+# 插件：只保留启动脚本、配置、SQL 和许可证；运行依赖从对应版本发行包恢复
+!/plugins/
+!/plugins/canal/
+!/plugins/canal/canal.deployer-1.1.8/
+!/plugins/canal/canal.deployer-1.1.8/bin/
+!/plugins/canal/canal.deployer-1.1.8/bin/**
+!/plugins/canal/canal.deployer-1.1.8/conf/
+!/plugins/canal/canal.deployer-1.1.8/conf/**
+!/plugins/logstash-7.17.29/
+!/plugins/logstash-7.17.29/bin/
+!/plugins/logstash-7.17.29/bin/logstash
+!/plugins/logstash-7.17.29/bin/logstash.bat
+!/plugins/logstash-7.17.29/bin/logstash.lib.sh
+!/plugins/logstash-7.17.29/bin/setup.bat
+!/plugins/logstash-7.17.29/bin/logstash-plugin
+!/plugins/logstash-7.17.29/bin/logstash-plugin.bat
+!/plugins/logstash-7.17.29/bin/logstash-keystore
+!/plugins/logstash-7.17.29/bin/logstash-keystore.bat
+!/plugins/logstash-7.17.29/config/
+!/plugins/logstash-7.17.29/config/**
+!/plugins/logstash-7.17.29/LICENSE.txt
+!/plugins/logstash-7.17.29/NOTICE.TXT
+
+# Nginx：保留运行程序、配置、静态页面和随附许可证
+!/nginx-1.18.0/
+!/nginx-1.18.0/nginx.exe
+!/nginx-1.18.0/conf/
+!/nginx-1.18.0/conf/**
+!/nginx-1.18.0/html/
+!/nginx-1.18.0/html/50x.html
+!/nginx-1.18.0/html/hmdp/
+!/nginx-1.18.0/html/hmdp/**
+!/nginx-1.18.0/docs/
+!/nginx-1.18.0/docs/*LICENSE
+!/nginx-1.18.0/docs/*.LICENCE
+
 # ------------------------------------------------------------
 #  放行需要提交的单个文件
 # ------------------------------------------------------------
@@ -109,7 +149,44 @@ edge-cdp/
 **/playwright-report/
 **/.cache/
 
+# --- XXL-JOB 非运行内容（doc/db 建表 SQL 在下方单独放行）---
+/xxl-job-3.4.0/.github/
+/xxl-job-3.4.0/docker/
+/xxl-job-3.4.0/doc/*
+
+# 管理端本地数据库凭证，按部署环境自行补充
+/xxl-job-3.4.0/xxl-job-admin/src/main/resources/application.properties
+
+# --- 插件本地状态、备份、可下载的 JDBC 驱动和凭证配置 ---
+/plugins/**/*.pid
+/plugins/**/nohup.out
+/plugins/**/*.bak*
+/plugins/canal/**/conf/**/meta.dat*
+/plugins/canal/**/conf/**/*.mv.db
+/plugins/canal/**/conf/**/*.trace.db
+/plugins/canal/**/conf/canal_local.properties
+/plugins/canal/**/conf/*/instance.properties
+/plugins/logstash-7.17.29/config/**/*.jar
+/plugins/logstash-7.17.29/config/**/last_run_time
+/plugins/logstash-7.17.29/config/**/logstash_jdbc_last_run
+/plugins/logstash-7.17.29/config/**/logstash.keystore
+/plugins/logstash-7.17.29/config/mysql/**/jdbc.conf
+
+# --- Nginx 静态目录中的 Git 元数据和运行时上传图片 ---
+/.git-backups/
+/nginx-1.18.0/**/.git/
+/nginx-1.18.0/html/hmdp/imgs/blogs/*
+
 # ============================================================
 #  三、明确要保留但可能被上面二次排除的文件（可选）
 # ============================================================
 !.gitkeep
+
+# XXL-JOB 初始化 SQL 与管理页面必需的 AdminLTE 静态资源
+!/xxl-job-3.4.0/doc/db/
+!/xxl-job-3.4.0/doc/db/**
+!/xxl-job-3.4.0/xxl-job-admin/src/main/resources/static/adminlte/dist/
+!/xxl-job-3.4.0/xxl-job-admin/src/main/resources/static/adminlte/dist/**
+
+# 保留随页面提供的示例图片
+!/nginx-1.18.0/html/hmdp/imgs/blogs/blog1.jpg
