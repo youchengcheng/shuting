@@ -54,6 +54,9 @@ public class FindChildCommentItemRspVO {
      */
     private Long likeTotal;
 
+    /** 当前访问者是否已点赞，仅在响应时填充。 */
+    private Boolean isLiked;
+
     /**
      * 回复的用户昵称
      */

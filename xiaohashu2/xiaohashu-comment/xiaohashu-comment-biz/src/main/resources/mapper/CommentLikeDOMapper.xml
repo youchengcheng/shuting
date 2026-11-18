@@ -92,6 +92,14 @@
   </select>
 
 <!-- 批量删除点赞记录 -->
+  <select id="selectLikedCommentIds" resultType="java.lang.Long">
+    select comment_id from t_comment_like
+    where user_id = #{userId} and comment_id in
+    <foreach collection="commentIds" item="commentId" open="(" separator="," close=")">
+      #{commentId}
+    </foreach>
+  </select>
+
   <delete id="batchDelete" parameterType="map">
     DELETE FROM t_comment_like
     WHERE (comment_id, user_id) IN

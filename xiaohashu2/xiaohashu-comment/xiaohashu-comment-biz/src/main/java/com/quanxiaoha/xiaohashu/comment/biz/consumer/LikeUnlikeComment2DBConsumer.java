@@ -91,25 +91,7 @@ public class LikeUnlikeComment2DBConsumer {
                     likeUnlikeCommentMqDTOS.add(JsonUtils.parseObject(msgJson,LikeUnlikeCommentMqDTO.class));
                 });
 
-                //按评论id分组
-                Map<Long, List<LikeUnlikeCommentMqDTO>> commentIdAndListMap = likeUnlikeCommentMqDTOS.stream()
-                        .collect(Collectors.groupingBy(LikeUnlikeCommentMqDTO::getCommentId));
-
-                List<LikeUnlikeCommentMqDTO> finalLikeUnlikeCommentMqDTOS = Lists.newArrayList();
-
-                commentIdAndListMap.forEach((commentId,ops) -> {
-                    // 优化：若某个用户对某评论，多次操作，如点赞 -> 取消点赞 -> 点赞，需进行操作合并，只提取最后一次操作，进一步降低操作数据库的频率
-                    Map<Long, LikeUnlikeCommentMqDTO> userLastOp = ops.stream().collect(Collectors
-                            .toMap(LikeUnlikeCommentMqDTO::getUserId, //以发布评论的用户id作为map键
-                                    Function.identity(),//直接使用 DTO 对象本身作为map的值
-                                    (oldValue, newValue) ->// 合并策略：当出现重复键（同一用户多次操作）时，保留时间更晚的记录
-                                            oldValue.getCreateTime().isAfter(newValue.getCreateTime()) ? oldValue : newValue
-                            ));
-                    finalLikeUnlikeCommentMqDTOS.addAll(userLastOp.values());
-                });
-
-                // 批量操作数据库
-                executeBatchSQL(finalLikeUnlikeCommentMqDTOS);
+                processBatch(likeUnlikeCommentMqDTOS);
 
                 //手动ACK，告诉rocketmq这批次消息消费成功
                 return ConsumeOrderlyStatus.SUCCESS;
@@ -123,6 +105,28 @@ public class LikeUnlikeComment2DBConsumer {
         //启动消费者
         consumer.start();
         return consumer;
+    }
+
+
+    void processBatch(List<LikeUnlikeCommentMqDTO> likeUnlikeCommentMqDTOS) {
+        //按评论id分组
+        Map<Long, List<LikeUnlikeCommentMqDTO>> commentIdAndListMap = likeUnlikeCommentMqDTOS.stream()
+                .collect(Collectors.groupingBy(LikeUnlikeCommentMqDTO::getCommentId));
+
+        List<LikeUnlikeCommentMqDTO> finalLikeUnlikeCommentMqDTOS = Lists.newArrayList();
+
+        commentIdAndListMap.forEach((commentId,ops) -> {
+            // 优化：若某个用户对某评论，多次操作，如点赞 -> 取消点赞 -> 点赞，需进行操作合并，只提取最后一次操作，进一步降低操作数据库的频率
+            Map<Long, LikeUnlikeCommentMqDTO> userLastOp = ops.stream().collect(Collectors
+                    .toMap(LikeUnlikeCommentMqDTO::getUserId, //以发布评论的用户id作为map键
+                            Function.identity(),//直接使用 DTO 对象本身作为map的值
+                            (oldValue, newValue) -> newValue // 顺序消息以批次顺序为准，跨副本时间可能偏移
+                    ));
+            finalLikeUnlikeCommentMqDTOS.addAll(userLastOp.values());
+        });
+
+        // 批量操作数据库
+        executeBatchSQL(finalLikeUnlikeCommentMqDTOS);
     }
 
 

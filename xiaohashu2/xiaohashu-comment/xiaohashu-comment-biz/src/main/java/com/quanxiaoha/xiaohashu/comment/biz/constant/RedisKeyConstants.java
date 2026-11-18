@@ -55,6 +55,17 @@ public class RedisKeyConstants {
      */
     private static final String BLOOM_COMMENT_LIKES_KEY_PREFIX = "bloom:comment:likes:";
 
+    private static final String COMMENT_LIKE_STATE_KEY_PREFIX = "comment:like:state:";
+    private static final String COMMENT_LIKE_LOCK_KEY_PREFIX = "comment:like:lock:";
+
+    public static String buildCommentLikeStateKey(Long userId, Long commentId) {
+        return COMMENT_LIKE_STATE_KEY_PREFIX + userId + ":" + commentId;
+    }
+
+    public static String buildCommentLikeLockKey(Long userId, Long commentId) {
+        return COMMENT_LIKE_LOCK_KEY_PREFIX + userId + ":" + commentId;
+    }
+
 
 
 

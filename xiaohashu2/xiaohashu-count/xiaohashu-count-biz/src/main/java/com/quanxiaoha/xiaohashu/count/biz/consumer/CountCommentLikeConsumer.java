@@ -96,50 +96,50 @@ public class CountCommentLikeConsumer implements RocketMQListener<String> {
                     }
                 }
 
-                //将分组后投机出的最终计数，存入countList中
-                countList.add(AggregationCountLikeUnlikeCommentMqDTO.builder()
-                        .commentId(key)
-                        .count(finalCount)
-                        .build());
             }
-            log.info("## 【评论点赞数】聚合后的计数数据: {}", JsonUtils.toJsonString(countList));
-
-            //更新redis
-            countList.forEach(item -> {
-                //评论id
-                Long commentId = item.getCommentId();
-                //聚合后的计数
-                Integer count = item.getCount();
-
-                //redis中评论计数hash key
-                String countCommentRdisKey = RedisKeyConstants.buildCountCommentKey(commentId);
-                //判断redis中hash是否存在
-                Boolean hasKey = redisTemplate.hasKey(countCommentRdisKey);
-
-                // 若存在才会更新
-                // (因为缓存设有过期时间，考虑到过期后，缓存会被删除，这里需要判断一下，存在才会去更新，而初始化工作放在查询计数来做)
-                if(hasKey) {
-                    //对目标用户hash中的点赞数字段进行计数操作
-                    redisTemplate.opsForHash().increment(countCommentRdisKey,RedisKeyConstants.FIELD_LIKE_TOTAL,count);
-                }
-            });
-
-            // 发送 MQ, 评论点赞数据落库
-            Message<String> message = MessageBuilder.withPayload(JsonUtils.toJsonString(countList))
-                    .build();
-
-            // 异步发送 MQ 消息
-            rocketMQTemplate.asyncSend(MQConstants.TOPIC_COUNT_COMMENT_LIKE_2_DB, message, new SendCallback() {
-                @Override
-                public void onSuccess(SendResult sendResult) {
-                    log.info("==> 【计数服务：评论点赞数写库】MQ 发送成功，SendResult: {}", sendResult);
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    log.error("==> 【计数服务：评论点赞数写库】MQ 发送异常: ", throwable);
-                }
-            });
+            //将分组后投机出的最终计数，存入countList中
+            countList.add(AggregationCountLikeUnlikeCommentMqDTO.builder()
+                    .commentId(key)
+                    .count(finalCount)
+                    .build());
         }
+        log.info("## 【评论点赞数】聚合后的计数数据: {}", JsonUtils.toJsonString(countList));
+
+        //更新redis
+        countList.forEach(item -> {
+            //评论id
+            Long commentId = item.getCommentId();
+            //聚合后的计数
+            Integer count = item.getCount();
+
+            //redis中评论计数hash key
+            String countCommentRdisKey = RedisKeyConstants.buildCountCommentKey(commentId);
+            //判断redis中hash是否存在
+            Boolean hasKey = redisTemplate.hasKey(countCommentRdisKey);
+
+            // 若存在才会更新
+            // (因为缓存设有过期时间，考虑到过期后，缓存会被删除，这里需要判断一下，存在才会去更新，而初始化工作放在查询计数来做)
+            if(hasKey) {
+                //对目标用户hash中的点赞数字段进行计数操作
+                redisTemplate.opsForHash().increment(countCommentRdisKey,RedisKeyConstants.FIELD_LIKE_TOTAL,count);
+            }
+        });
+
+        // 发送 MQ, 评论点赞数据落库
+        Message<String> message = MessageBuilder.withPayload(JsonUtils.toJsonString(countList))
+                .build();
+
+        // 异步发送 MQ 消息
+        rocketMQTemplate.asyncSend(MQConstants.TOPIC_COUNT_COMMENT_LIKE_2_DB, message, new SendCallback() {
+            @Override
+            public void onSuccess(SendResult sendResult) {
+                log.info("==> 【计数服务：评论点赞数写库】MQ 发送成功，SendResult: {}", sendResult);
+            }
+
+            @Override
+            public void onException(Throwable throwable) {
+                log.error("==> 【计数服务：评论点赞数写库】MQ 发送异常: ", throwable);
+            }
+        });
     }
 }

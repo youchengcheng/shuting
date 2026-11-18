@@ -30,6 +30,9 @@ public interface CommentLikeDOMapper {
      */
     List<CommentLikeDO> selectByUserId(@Param("userId") Long userId);
 
+    List<Long> selectLikedCommentIds(@Param("userId") Long userId,
+                                    @Param("commentIds") List<Long> commentIds);
+
     /**
      * 批量删除点赞记录
      */

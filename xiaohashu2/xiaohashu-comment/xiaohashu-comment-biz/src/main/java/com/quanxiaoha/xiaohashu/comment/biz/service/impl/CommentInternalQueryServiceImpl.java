@@ -42,7 +42,7 @@ public class CommentInternalQueryServiceImpl implements CommentInternalQueryServ
     @Resource
     private CommentDOMapper commentDOMapper;
     @Resource
-    private CommentLikeDOMapper commentLikeDOMapper;
+    private CommentLikeStateService commentLikeStateService;
     @Resource
     private CommentReplyValidator commentReplyValidator;
     @Resource
@@ -169,16 +169,18 @@ public class CommentInternalQueryServiceImpl implements CommentInternalQueryServ
             unique.put(repliedTo.getId(), repliedTo);
         }
         List<CommentDO> selected = new ArrayList<>(unique.values());
+        Map<Long, Boolean> likeStates = commentLikeStateService.findStates(viewer,
+                new ArrayList<>(unique.keySet()));
         Map<Long, String> contents = contents(selected);
         // 通过本模块 RPC 包装批量读取作者资料，缺失资料时使用空昵称和头像
         List<FindUserByIdRspDTO> users = userRpcService.findByIds(selected.stream().map(CommentDO::getUserId).distinct().toList());
         Map<Long, FindUserByIdRspDTO> profiles = users == null ? Collections.emptyMap()
                 : users.stream().collect(Collectors.toMap(FindUserByIdRspDTO::getId, u -> u));
         // 分别填充一级评论、目标评论和被回复评论，便于前端定位与高亮
-        result.setRoot(contextItem(root, contents, profiles, viewer));
-        result.setTarget(contextItem(target, contents, profiles, viewer));
+        result.setRoot(contextItem(root, contents, profiles, likeStates));
+        result.setTarget(contextItem(target, contents, profiles, likeStates));
         if (repliedTo != null) {
-            result.setRepliedTo(contextItem(repliedTo, contents, profiles, viewer));
+            result.setRepliedTo(contextItem(repliedTo, contents, profiles, likeStates));
         }
         return result;
     }
@@ -226,7 +228,7 @@ public class CommentInternalQueryServiceImpl implements CommentInternalQueryServ
      * 组装相关评论信息
      * */
     private CommentContextItemVO contextItem(CommentDO comment, Map<Long, String> contents,
-                                            Map<Long, FindUserByIdRspDTO> profiles, Long viewer) {
+                                            Map<Long, FindUserByIdRspDTO> profiles, Map<Long, Boolean> likeStates) {
         // 关联评论作者资料，计数为空时展示为零，并查询当前访问者是否点赞
         FindUserByIdRspDTO user = profiles.get(comment.getUserId());
         return CommentContextItemVO.builder()
@@ -244,7 +246,7 @@ public class CommentInternalQueryServiceImpl implements CommentInternalQueryServ
                 .createTime(comment.getCreateTime())
                 .likeTotal(comment.getLikeTotal() == null ? 0L : comment.getLikeTotal())
                 .childCommentTotal(comment.getChildCommentTotal() == null ? 0L : comment.getChildCommentTotal())
-                .liked(viewer != null && commentLikeDOMapper.selectCountByUserIdAndCommentId(viewer, comment.getId()) > 0)
+                .liked(likeStates.getOrDefault(comment.getId(), false))
                 .build();
     }
 

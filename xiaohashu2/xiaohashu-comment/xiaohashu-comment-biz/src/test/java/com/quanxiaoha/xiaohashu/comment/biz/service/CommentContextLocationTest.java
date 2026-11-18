@@ -8,6 +8,7 @@ import com.quanxiaoha.xiaohashu.comment.biz.domain.mapper.*;
 import com.quanxiaoha.xiaohashu.comment.biz.model.vo.*;
 import com.quanxiaoha.xiaohashu.comment.biz.rpc.*;
 import com.quanxiaoha.xiaohashu.comment.biz.service.impl.CommentInternalQueryServiceImpl;
+import com.quanxiaoha.xiaohashu.comment.biz.service.impl.CommentLikeStateService;
 import com.quanxiaoha.xiaohashu.comment.biz.service.impl.CommentReplyValidatorImpl;
 import org.junit.jupiter.api.*;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -26,6 +27,7 @@ class CommentContextLocationTest {
     private final UserRpcService users = mock(UserRpcService.class);
     private final RedisTemplate<String, Object> redis = mock(RedisTemplate.class);
     private final ZSetOperations<String, Object> zset = mock(ZSetOperations.class);
+    private final CommentLikeStateService likeStates = mock(CommentLikeStateService.class);
     private final CommentInternalQueryService service = new CommentInternalQueryServiceImpl();
     private final CommentDO root = comment(100L, 1, 1L);
     private final CommentDO child = comment(200L, 2, 100L);
@@ -34,7 +36,8 @@ class CommentContextLocationTest {
         CommentReplyValidator validator = new CommentReplyValidatorImpl();
         ReflectionTestUtils.setField(validator, "commentDOMapper", mapper);
         ReflectionTestUtils.setField(service, "commentDOMapper", mapper);
-        ReflectionTestUtils.setField(service, "commentLikeDOMapper", mock(CommentLikeDOMapper.class));
+        ReflectionTestUtils.setField(service, "commentLikeStateService", likeStates);
+        when(likeStates.findStates(anyLong(), anyList())).thenReturn(Map.of());
         ReflectionTestUtils.setField(service, "commentReplyValidator", validator);
         ReflectionTestUtils.setField(service, "noteAccessService", access);
         ReflectionTestUtils.setField(service, "keyValueRpcService", kv);
@@ -73,6 +76,14 @@ class CommentContextLocationTest {
         assertEquals(200L, result.getTarget().getCommentId());
         assertEquals(100L, result.getRoot().getCommentId());
         verify(mapper, never()).selectChildCommentPosition(anyLong(), anyLong());
+    }
+
+    @Test void contextReturnsTheLatestLikeStatesInOneBatch() {
+        when(likeStates.findStates(9L, List.of(100L, 200L))).thenReturn(Map.of(100L, false, 200L, true));
+        CommentContextRspVO result = service.context(request(200L));
+        assertFalse(result.getRoot().getLiked());
+        assertTrue(result.getTarget().getLiked());
+        verify(likeStates).findStates(9L, List.of(100L, 200L));
     }
 
     @Test void databasePageBoundariesMatchTenRootsAndSixReplies() {
